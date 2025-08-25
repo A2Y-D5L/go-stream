@@ -142,7 +142,9 @@ func New(ctx context.Context, opts ...Option) (*Stream, error) {
 	return s, nil
 }
 
-// Healthy returns nil when the client connection is live and the server is up.
+// Healthy returns an error if the stream is not in a healthy state. This is a
+// lightweight check that verifies the basic operational status of the stream.
+// For a more thorough check including server readiness, use DeepHealthCheck().
 func (s *Stream) Healthy(ctx context.Context) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -161,15 +163,36 @@ func (s *Stream) Healthy(ctx context.Context) error {
 	case s.nc.Status() != nats.CONNECTED:
 		return fmt.Errorf("%w: client not connected", ErrStreamUnhealthy)
 	default:
+		// For high-load scenarios, if the client is connected, assume the server is ready.
+		// This avoids expensive server readiness checks on every publish operation.
+		// If there are actual server issues, they will manifest as client connection problems.
+		return nil
+	}
+}
+
+// DeepHealthCheck performs a thorough health check including server readiness verification.
+// This is more expensive than Healthy() and should be used sparingly.
+func (s *Stream) DeepHealthCheck(ctx context.Context) error {
+	// First do the basic health check
+	if err := s.Healthy(ctx); err != nil {
+		return err
+	}
+
+	s.mu.RLock()
+	srv := s.srv
+	s.mu.RUnlock()
+
+	// Now do the expensive server readiness check
+	if srv != nil {
 		ctx, cancel := context.WithTimeout(ctx, s.cfg.ServerReadyTimeout)
 		defer cancel()
 
-		if err := s.srv.Ready(ctx); err != nil {
+		if err := srv.Ready(ctx); err != nil {
 			return fmt.Errorf("%w: server not ready", ErrStreamUnhealthy)
 		}
-
-		return nil
 	}
+
+	return nil
 }
 
 // Close drains the client and shuts down the server gracefully.

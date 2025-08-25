@@ -94,7 +94,7 @@ func WithConnectTimeout(d time.Duration) Option { return func(c *config) { c.Con
 func WithReconnectWait(min time.Duration) Option { return func(c *config) { c.ReconnectWaitMin = min } }
 
 // WithDrainTimeout sets how long Close waits for client drain before hard-close.
-func WithDrainTimeout(d time.Duration) Option { return func(c *config) { c.ServerShutdownMaxWait = d } }
+func WithDrainTimeout(d time.Duration) Option { return func(c *config) { c.DrainTimeout = d } }
 
 // WithServerReadyTimeout sets how long to wait for the embedded server to be ready.
 func WithServerReadyTimeout(d time.Duration) Option { return func(c *config) { c.ServerReadyTimeout = d } }

@@ -20,6 +20,7 @@ func CreateTestStream(t *testing.T, opts ...Option) *Stream {
 	defaultOpts := []Option{
 		WithPort(-1), // dynamic port
 		WithServerReadyTimeout(5 * time.Second),
+		WithDrainTimeout(1 * time.Second), // Add proper drain timeout for tests
 		WithDisableJetStream(), // Disable JetStream for faster startup
 	}
 	

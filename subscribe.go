@@ -158,8 +158,21 @@ func (s *Stream) Subscribe(topic Topic, sub Subscriber, opts ...SubscribeOption)
 					if !ok {
 						return
 					}
-					// Best-effort ctx (can be enhanced with tracing/req-id in later steps)
-					_ = sub.Handle(context.Background(), m)
+					// Handle message with panic recovery
+					func() {
+						defer func() {
+							if r := recover(); r != nil {
+								// Log the panic but don't crash the worker
+								if s.log != nil {
+									s.log.Error("subscriber panic recovered", 
+										"panic", r, 
+										"topic", m.Topic)
+								}
+							}
+						}()
+						// Best-effort ctx (can be enhanced with tracing/req-id in later steps)
+						_ = sub.Handle(context.Background(), m)
+					}()
 				}
 			}
 		}()

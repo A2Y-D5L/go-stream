@@ -1,229 +1,459 @@
 package stream
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
+	"github.com/nats-io/nats.go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestMessage_Creation(t *testing.T) {
-	t.Run("basic message creation", func(t *testing.T) {
-		topic := Topic("test.topic")
-		data := []byte("test data")
-		headers := map[string]string{
-			"Content-Type": "application/json",
-			"X-Request-Id": "test-123",
-		}
-		id := "msg-123"
-		timestamp := time.Now()
+// --------------------- Additional Test Data Types ---------------------
 
+type MessageTestData struct {
+	ID    int    `json:"id"`
+	Value string `json:"value"`
+}
+
+// --------------------- Enhanced Message Serialization Tests ---------------------
+
+func TestMessage_JSONSerialization(t *testing.T) {
+	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+
+	t.Run("serialize complete message", func(t *testing.T) {
 		msg := Message{
-			Topic:   topic,
-			Data:    data,
-			Headers: headers,
-			ID:      id,
-			Time:    timestamp,
+			Topic:   "user.created",
+			Data:    []byte(`{"id": 123, "name": "John"}`),
+			Headers: map[string]string{
+				"Content-Type": "application/json",
+				"X-Request-Id": "req-123",
+			},
+			ID:   "msg-456",
+			Time: now,
 		}
 
-		assert.Equal(t, topic, msg.Topic)
-		assert.Equal(t, data, msg.Data)
-		assert.Equal(t, headers, msg.Headers)
-		assert.Equal(t, id, msg.ID)
-		assert.Equal(t, timestamp, msg.Time)
+		// Serialize to JSON
+		data, err := json.Marshal(msg)
+		require.NoError(t, err)
+		assert.Contains(t, string(data), "user.created")
+		assert.Contains(t, string(data), "msg-456")
+
+		// Deserialize back
+		var restored Message
+		err = json.Unmarshal(data, &restored)
+		require.NoError(t, err)
+
+		assert.Equal(t, msg.Topic, restored.Topic)
+		assert.Equal(t, msg.Data, restored.Data)
+		assert.Equal(t, msg.Headers, restored.Headers)
+		assert.Equal(t, msg.ID, restored.ID)
+		assert.True(t, msg.Time.Equal(restored.Time))
 	})
 
-	t.Run("message with empty data", func(t *testing.T) {
+	t.Run("serialize message with nil headers", func(t *testing.T) {
 		msg := Message{
-			Topic:   Topic("test.topic"),
-			Data:    []byte{},
+			Topic: "test.topic",
+			Data:  []byte("test data"),
+			Time:  now,
+		}
+
+		data, err := json.Marshal(msg)
+		require.NoError(t, err)
+
+		var restored Message
+		err = json.Unmarshal(data, &restored)
+		require.NoError(t, err)
+
+		assert.Equal(t, msg.Topic, restored.Topic)
+		assert.Equal(t, msg.Data, restored.Data)
+		assert.Nil(t, restored.Headers) // nil headers should remain nil
+	})
+
+	t.Run("serialize message with empty data", func(t *testing.T) {
+		msg := Message{
+			Topic: "empty.data",
+			Data:  []byte{},
+			Time:  now,
+		}
+
+		data, err := json.Marshal(msg)
+		require.NoError(t, err)
+
+		var restored Message
+		err = json.Unmarshal(data, &restored)
+		require.NoError(t, err)
+
+		assert.Equal(t, msg.Topic, restored.Topic)
+		assert.Equal(t, []byte{}, restored.Data)
+	})
+}
+
+// --------------------- NATS Message Conversion Tests ---------------------
+
+func TestMessage_NATSConversion(t *testing.T) {
+	t.Run("convert from NATS message", func(t *testing.T) {
+		natsMsg := &nats.Msg{
+			Subject: "user.updated",
+			Data:    []byte(`{"id": 456, "status": "active"}`),
+			Reply:   "response.topic",
+			Header: nats.Header{
+				"Content-Type":  []string{"application/json"},
+				"X-Request-Id":  []string{"req-789"},
+				"Authorization": []string{"Bearer secret"},
+			},
+		}
+
+		// Convert to our Message type
+		msg := Message{
+			Topic:   Topic(natsMsg.Subject),
+			Data:    natsMsg.Data,
 			Headers: make(map[string]string),
-		}
-		assert.Equal(t, Topic("test.topic"), msg.Topic)
-		assert.Empty(t, msg.Data)
-		assert.NotNil(t, msg.Headers)
-		assert.Empty(t, msg.Headers)
-	})
-
-	t.Run("message with nil headers", func(t *testing.T) {
-		msg := Message{
-			Topic:   Topic("test.topic"),
-			Data:    []byte("data"),
-			Headers: nil,
-		}
-
-		assert.Equal(t, Topic("test.topic"), msg.Topic)
-		assert.Equal(t, []byte("data"), msg.Data)
-		assert.Nil(t, msg.Headers)
-	})
-
-	t.Run("message with large payload", func(t *testing.T) {
-		oneMB := 1024 * 1024
-		largeData := GenerateTestPayload(oneMB)
-		msg := Message{Data: largeData}
-		assert.Equal(t, oneMB, len(msg.Data))
-		assert.Equal(t, largeData, msg.Data)
-	})
-}
-
-func TestMessage_HeaderManagement(t *testing.T) {
-	t.Run("header setting and getting", func(t *testing.T) {
-		msg := Message{Headers: map[string]string{
-			"Content-Type":  "application/json",
-			"X-Request-Id":  "test-123",
-			"Custom-Header": "custom-value",
-		}}
-		assert.Equal(t, "application/json", msg.Headers["Content-Type"])
-		assert.Equal(t, "test-123", msg.Headers["X-Request-Id"])
-		assert.Equal(t, "custom-value", msg.Headers["Custom-Header"])
-		assert.Len(t, msg.Headers, 3)
-	})
-
-	t.Run("header overrides", func(t *testing.T) {
-		msg := Message{Headers: map[string]string{
-			"Content-Type": "text/plain",
-			"X-Request-Id": "original-123",
-		}}
-		msg.Headers["Content-Type"] = "application/json"
-		msg.Headers["X-Request-Id"] = "new-456"
-		assert.Equal(t, "application/json", msg.Headers["Content-Type"])
-		assert.Equal(t, "new-456", msg.Headers["X-Request-Id"])
-	})
-
-	t.Run("empty header values", func(t *testing.T) {
-		msg := Message{Headers: map[string]string{
-			"Empty-Header":     "",
-			"Non-Empty-Header": "value",
-		}}
-		assert.Equal(t, "", msg.Headers["Empty-Header"])
-		assert.Equal(t, "value", msg.Headers["Non-Empty-Header"])
-		assert.Len(t, msg.Headers, 2)
-	})
-
-	t.Run("headers with special characters", func(t *testing.T) {
-		msg := Message{Headers: map[string]string{
-			"Unicode-Header": "Hello, 世界! 🌍",
-			"Special-Chars":  "!@#$%^&*()_+-=[]{}|;:,.<>?",
-		}}
-		assert.Equal(t, "Hello, 世界! 🌍", msg.Headers["Unicode-Header"])
-		assert.Equal(t, "!@#$%^&*()_+-=[]{}|;:,.<>?", msg.Headers["Special-Chars"])
-	})
-}
-
-func TestMessage_Timestamps(t *testing.T) {
-	t.Run("timestamp handling", func(t *testing.T) {
-		before := time.Now()
-		time.Sleep(1 * time.Millisecond) // Ensure different timestamp
-		msg := Message{Time: time.Now()}
-		time.Sleep(1 * time.Millisecond)
-		after := time.Now()
-		assert.True(t, msg.Time.After(before))
-		assert.True(t, msg.Time.Before(after))
-	})
-
-	t.Run("zero timestamp", func(t *testing.T) {
-		msg := Message{Time: time.Time{}}
-		assert.True(t, msg.Time.IsZero())
-	})
-}
-
-func TestMessage_IDHandling(t *testing.T) {
-	t.Run("explicit message ID", func(t *testing.T) {
-		id := "explicit-id-123"
-		msg := Message{ID: id}
-		assert.Equal(t, id, msg.ID)
-	})
-
-	t.Run("empty message ID", func(t *testing.T) {
-		msg := Message{ID: ""}
-		assert.Empty(t, msg.ID)
-	})
-
-	t.Run("message ID uniqueness", func(t *testing.T) {
-		msg1 := Message{ID: "id-1"}
-		msg2 := Message{ID: "id-2"}
-		assert.NotEqual(t, msg1.ID, msg2.ID)
-	})
-}
-
-func TestMessage_Validation(t *testing.T) {
-	t.Run("valid message", func(t *testing.T) {
-		msg := Message{
-			Topic:   Topic("valid.topic"),
-			Data:    []byte("valid data"),
-			Headers: map[string]string{"Content-Type": "application/json"},
-			ID:      "valid-id",
 			Time:    time.Now(),
 		}
-		assert.NotEmpty(t, msg.Topic)
-		assert.NotNil(t, msg.Data)
-		assert.NotNil(t, msg.Headers)
-		assert.NotEmpty(t, msg.ID)
-		assert.False(t, msg.Time.IsZero())
+
+		// Convert headers
+		for k, vv := range natsMsg.Header {
+			if len(vv) > 0 {
+				msg.Headers[k] = vv[0]
+			}
+		}
+
+		assert.Equal(t, Topic("user.updated"), msg.Topic)
+		assert.Equal(t, natsMsg.Data, msg.Data)
+		assert.Equal(t, "application/json", msg.Headers["Content-Type"])
+		assert.Equal(t, "req-789", msg.Headers["X-Request-Id"])
+		assert.Equal(t, "Bearer secret", msg.Headers["Authorization"])
 	})
 
-	t.Run("minimal valid message", func(t *testing.T) {
+	t.Run("convert to NATS message", func(t *testing.T) {
 		msg := Message{
-			Topic: Topic("minimal.topic"),
-			Data:  []byte("data"),
+			Topic: "order.processed",
+			Data:  []byte(`{"order_id": "ORD-123", "amount": 99.99}`),
+			Headers: map[string]string{
+				"Content-Type": "application/json",
+				"X-User-Id":    "user-456",
+			},
+			ID:   "msg-789",
+			Time: time.Now(),
 		}
-		assert.NotEmpty(t, msg.Topic)
-		assert.NotNil(t, msg.Data)
+
+		// Convert to NATS message
+		natsMsg := &nats.Msg{
+			Subject: string(msg.Topic),
+			Data:    msg.Data,
+			Header:  make(nats.Header),
+		}
+
+		// Convert headers
+		for k, v := range msg.Headers {
+			natsMsg.Header.Set(k, v)
+		}
+
+		assert.Equal(t, "order.processed", natsMsg.Subject)
+		assert.Equal(t, msg.Data, natsMsg.Data)
+		assert.Equal(t, "application/json", natsMsg.Header.Get("Content-Type"))
+		assert.Equal(t, "user-456", natsMsg.Header.Get("X-User-Id"))
+	})
+
+	t.Run("convert with empty headers", func(t *testing.T) {
+		msg := Message{
+			Topic: "simple.message",
+			Data:  []byte("simple data"),
+			Time:  time.Now(),
+		}
+
+		natsMsg := &nats.Msg{
+			Subject: string(msg.Topic),
+			Data:    msg.Data,
+			Header:  make(nats.Header),
+		}
+
+		assert.Equal(t, "simple.message", natsMsg.Subject)
+		assert.Equal(t, msg.Data, natsMsg.Data)
+		assert.Empty(t, natsMsg.Header)
 	})
 }
 
-func TestMessage_BinaryData(t *testing.T) {
-	t.Run("binary data handling", func(t *testing.T) {
-		binaryData := []byte{0x00, 0x01, 0x02, 0xFF, 0xFE, 0xFD}
-		msg := Message{Data: binaryData}
-		assert.Equal(t, binaryData, msg.Data)
-		assert.Len(t, msg.Data, 6)
+// --------------------- Message Header Operations Tests ---------------------
+
+func TestMessage_HeaderOperations(t *testing.T) {
+	t.Run("header case sensitivity", func(t *testing.T) {
+		msg := Message{
+			Topic: "test.headers",
+			Data:  []byte("data"),
+			Headers: map[string]string{
+				"Content-Type": "application/json",
+				"content-type": "text/plain", // Different case
+			},
+			Time: time.Now(),
+		}
+
+		// Headers should be case-sensitive in our implementation
+		assert.Equal(t, "application/json", msg.Headers["Content-Type"])
+		assert.Equal(t, "text/plain", msg.Headers["content-type"])
+		assert.Equal(t, 2, len(msg.Headers))
 	})
 
-	t.Run("large binary data", func(t *testing.T) {
+	t.Run("header modification", func(t *testing.T) {
+		msg := Message{
+			Topic:   "test.modify",
+			Data:    []byte("data"),
+			Headers: map[string]string{"Initial": "value"},
+			Time:    time.Now(),
+		}
+
+		// Modify headers
+		msg.Headers["New-Header"] = "new-value"
+		msg.Headers["Initial"] = "updated-value"
+
+		assert.Equal(t, "updated-value", msg.Headers["Initial"])
+		assert.Equal(t, "new-value", msg.Headers["New-Header"])
+		assert.Equal(t, 2, len(msg.Headers))
+	})
+
+	t.Run("nil headers map", func(t *testing.T) {
+		msg := Message{
+			Topic:   "test.nil",
+			Data:    []byte("data"),
+			Headers: nil,
+			Time:    time.Now(),
+		}
+
+		assert.Nil(t, msg.Headers)
+
+		// Initialize headers map
+		msg.Headers = make(map[string]string)
+		msg.Headers["Added"] = "after-init"
+
+		assert.Equal(t, "after-init", msg.Headers["Added"])
+		assert.Equal(t, 1, len(msg.Headers))
+	})
+}
+
+// --------------------- Message Data Handling Tests ---------------------
+
+func TestMessage_DataHandling(t *testing.T) {
+	t.Run("text data", func(t *testing.T) {
+		text := "Hello, World!"
+		msg := Message{
+			Topic: "text.message",
+			Data:  []byte(text),
+			Time:  time.Now(),
+		}
+
+		assert.Equal(t, text, string(msg.Data))
+	})
+
+	t.Run("json data", func(t *testing.T) {
+		testData := MessageTestData{ID: 123, Value: "test"}
+		jsonData, err := json.Marshal(testData)
+		require.NoError(t, err)
+
+		msg := Message{
+			Topic:   "json.message",
+			Data:    jsonData,
+			Headers: map[string]string{"Content-Type": "application/json"},
+			Time:    time.Now(),
+		}
+
+		var decoded MessageTestData
+		err = json.Unmarshal(msg.Data, &decoded)
+		require.NoError(t, err)
+		assert.Equal(t, testData, decoded)
+	})
+
+	t.Run("binary data", func(t *testing.T) {
+		binaryData := []byte{0x00, 0x01, 0x02, 0xFF, 0xFE, 0xFD}
+		msg := Message{
+			Topic:   "binary.message",
+			Data:    binaryData,
+			Headers: map[string]string{"Content-Type": "application/octet-stream"},
+			Time:    time.Now(),
+		}
+
+		assert.Equal(t, binaryData, msg.Data)
+		assert.Equal(t, len(binaryData), len(msg.Data))
+	})
+
+	t.Run("large data", func(t *testing.T) {
+		// Create 1MB of data
 		largeData := make([]byte, 1024*1024)
 		for i := range largeData {
 			largeData[i] = byte(i % 256)
 		}
-		msg := Message{Data: largeData}
+
+		msg := Message{
+			Topic: "large.message",
+			Data:  largeData,
+			Time:  time.Now(),
+		}
+
+		assert.Equal(t, 1024*1024, len(msg.Data))
 		assert.Equal(t, largeData, msg.Data)
-		assert.Len(t, msg.Data, 1024*1024)
 	})
 }
 
-func TestMessage_Equality(t *testing.T) {
-	t.Run("identical messages", func(t *testing.T) {
-		timestamp := time.Now()
-		headers := map[string]string{"key": "value"}
+// --------------------- Message Topic Handling Tests ---------------------
 
-		msg1 := Message{
-			Topic:   Topic("test.topic"),
-			Data:    []byte("test data"),
-			Headers: headers,
-			ID:      "id-123",
-			Time:    timestamp,
+func TestMessage_TopicHandling(t *testing.T) {
+	testCases := []struct {
+		name      string
+		topic     Topic
+		expectStr string
+	}{
+		{"simple topic", "user", "user"},
+		{"dotted topic", "user.created", "user.created"},
+		{"hierarchical topic", "api.v1.users.created", "api.v1.users.created"},
+		{"wildcard topic", "users.*", "users.*"},
+		{"empty topic", "", ""},
+		{"topic with special chars", "user-events_2024", "user-events_2024"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			msg := Message{
+				Topic: tc.topic,
+				Data:  []byte("test"),
+				Time:  time.Now(),
+			}
+
+			assert.Equal(t, tc.topic, msg.Topic)
+			assert.Equal(t, tc.expectStr, string(msg.Topic))
+		})
+	}
+}
+
+// --------------------- Message Time Handling Tests ---------------------
+
+func TestMessage_TimeHandling(t *testing.T) {
+	t.Run("current time", func(t *testing.T) {
+		before := time.Now()
+		msg := Message{
+			Topic: "time.test",
+			Data:  []byte("data"),
+			Time:  time.Now(),
+		}
+		after := time.Now()
+
+		assert.True(t, msg.Time.After(before) || msg.Time.Equal(before))
+		assert.True(t, msg.Time.Before(after) || msg.Time.Equal(after))
+	})
+
+	t.Run("specific time", func(t *testing.T) {
+		specificTime := time.Date(2024, 6, 15, 14, 30, 45, 0, time.UTC)
+		msg := Message{
+			Topic: "scheduled.message",
+			Data:  []byte("scheduled data"),
+			Time:  specificTime,
 		}
 
-		msg2 := Message{
-			Topic:   Topic("test.topic"),
-			Data:    []byte("test data"),
-			Headers: headers,
-			ID:      "id-123",
-			Time:    timestamp,
+		assert.Equal(t, specificTime, msg.Time)
+		assert.Equal(t, 2024, msg.Time.Year())
+		assert.Equal(t, time.June, msg.Time.Month())
+		assert.Equal(t, 15, msg.Time.Day())
+	})
+
+	t.Run("zero time", func(t *testing.T) {
+		msg := Message{
+			Topic: "zero.time",
+			Data:  []byte("data"),
+			Time:  time.Time{},
 		}
 
-		AssertMessageEqual(t, msg1, msg2)
+		assert.True(t, msg.Time.IsZero())
 	})
 
-	t.Run("different topics", func(t *testing.T) {
-		msg1 := Message{Topic: Topic("topic1")}
-		msg2 := Message{Topic: Topic("topic2")}
-		assert.NotEqual(t, msg1.Topic, msg2.Topic)
-	})
+	t.Run("time zone handling", func(t *testing.T) {
+		utc := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+		est := utc.In(time.FixedZone("EST", -5*3600))
 
-	t.Run("different data", func(t *testing.T) {
-		msg1 := Message{Data: []byte("data1")}
-		msg2 := Message{Data: []byte("data2")}
-		assert.NotEqual(t, msg1.Data, msg2.Data)
+		msgUTC := Message{Topic: "utc", Data: []byte("data"), Time: utc}
+		msgEST := Message{Topic: "est", Data: []byte("data"), Time: est}
+
+		assert.True(t, msgUTC.Time.Equal(msgEST.Time)) // Same instant
+		assert.NotEqual(t, msgUTC.Time.String(), msgEST.Time.String()) // Different string representation
 	})
+}
+
+// --------------------- Message Performance Benchmarks ---------------------
+
+func BenchmarkMessage_Creation(b *testing.B) {
+	headers := map[string]string{
+		"Content-Type": "application/json",
+		"X-Request-Id": "req-123",
+	}
+	data := []byte(`{"id": 123, "name": "test"}`)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = Message{
+			Topic:   "benchmark.topic",
+			Data:    data,
+			Headers: headers,
+			ID:      "msg-456",
+			Time:    time.Now(),
+		}
+	}
+}
+
+func BenchmarkMessage_JSONMarshal(b *testing.B) {
+	msg := Message{
+		Topic: "benchmark.json",
+		Data:  []byte(`{"id": 123, "value": "test data"}`),
+		Headers: map[string]string{
+			"Content-Type": "application/json",
+			"X-Request-Id": "req-456",
+		},
+		ID:   "msg-789",
+		Time: time.Now(),
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := json.Marshal(msg)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkMessage_JSONUnmarshal(b *testing.B) {
+	msg := Message{
+		Topic: "benchmark.json",
+		Data:  []byte(`{"id": 123, "value": "test data"}`),
+		Headers: map[string]string{
+			"Content-Type": "application/json",
+			"X-Request-Id": "req-456",
+		},
+		ID:   "msg-789",
+		Time: time.Now(),
+	}
+	data, _ := json.Marshal(msg)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var restored Message
+		err := json.Unmarshal(data, &restored)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkMessage_HeaderOperations(b *testing.B) {
+	msg := Message{
+		Topic:   "benchmark.headers",
+		Data:    []byte("data"),
+		Headers: make(map[string]string),
+		Time:    time.Now(),
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		msg.Headers["Key"] = "Value"
+		_ = msg.Headers["Key"]
+		delete(msg.Headers, "Key")
+	}
 }
