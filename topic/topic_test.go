@@ -67,7 +67,7 @@ func TestTopic_Validation(t *testing.T) {
 			name:     "topic with double dots",
 			topic:    "user..events",
 			valid:    false,
-			expected: "",	
+			expected: "",
 		},
 		{
 			name:     "topic starting with dot",
@@ -157,13 +157,13 @@ func TestTopic_Sanitization(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := topic.Sanitize(tt.input)
 			assert.Equal(t, tt.expected, result)
-			
+
 			// Verify sanitized name is within length limit
 			assert.LessOrEqual(t, len(result), 48)
-			
+
 			// Verify no consecutive underscores
 			assert.NotContains(t, result, "__")
-			
+
 			// Verify no leading/trailing underscores
 			if len(result) > 0 && result != "unnamed" {
 				assert.NotEqual(t, '_', result[0])
@@ -193,8 +193,8 @@ func TestTopicMode_String(t *testing.T) {
 func TestTopicOptions_Defaults(t *testing.T) {
 	t.Run("zero value options", func(t *testing.T) {
 		var opts topic.Options
-		
-		assert.Equal(t, topic.Mode(0), opts.Mode) // TopicModeCore
+
+		assert.Equal(t, topic.Mode(0), opts.Mode)           // TopicModeCore
 		assert.Equal(t, topic.Retention(0), opts.Retention) // RetentionEphemeral
 		assert.Equal(t, int64(0), opts.MaxBytes)
 		assert.Equal(t, int64(0), opts.MaxMessages)
@@ -212,12 +212,12 @@ func TestTopicOptions_Configuration(t *testing.T) {
 			Mode:          topic.ModeJetStream,
 			Retention:     topic.RetentionDurable,
 			MaxBytes:      1024 * 1024 * 1024, // 1GB
-			MaxMessages:       1000000,
+			MaxMessages:   1000000,
 			MaxAge:        24 * time.Hour,
 			Replicas:      1, // Single embedded server
 			DiscardPolicy: topic.DiscardOld,
 		}
-		
+
 		assert.Equal(t, topic.ModeJetStream, opts.Mode)
 		assert.Equal(t, topic.RetentionDurable, opts.Retention)
 		assert.Equal(t, int64(1024*1024*1024), opts.MaxBytes)
@@ -229,7 +229,7 @@ func TestTopicOptions_Configuration(t *testing.T) {
 
 	t.Run("core mode configuration", func(t *testing.T) {
 		opts := topic.Options{
-			Mode:            topic.ModeCore,
+			Mode: topic.ModeCore,
 			// SubjectOverride: "custom.subject.name",
 			// Codec:           message.JSONCodec,
 		}
@@ -281,7 +281,7 @@ func TestTopic_TypeSafety(t *testing.T) {
 
 		topicMap[topic1] = "value1"
 		topicMap[topic2] = "value2"
-		
+
 		assert.Equal(t, "value1", topicMap[topic1])
 		assert.Equal(t, "value2", topicMap[topic2])
 		assert.Len(t, topicMap, 2)
@@ -292,7 +292,7 @@ func TestTopic_EdgeCases(t *testing.T) {
 	t.Run("unicode topic names", func(t *testing.T) {
 		unicodeTopic := topic.Topic("用户.事件.测试")
 		assert.Equal(t, "用户.事件.测试", string(unicodeTopic))
-		
+
 		// Test sanitization of unicode
 		sanitized := topic.Sanitize(string(unicodeTopic))
 		assert.NotEmpty(t, sanitized)
@@ -301,7 +301,7 @@ func TestTopic_EdgeCases(t *testing.T) {
 	t.Run("very long topic names", func(t *testing.T) {
 		longTopic := topic.Topic("this.is.a.very.long.topic.name.that.might.cause.issues.if.not.handled.properly.in.the.system")
 		assert.NotEmpty(t, string(longTopic))
-		
+
 		// Test sanitization handles long names
 		sanitized := topic.Sanitize(string(longTopic))
 		assert.LessOrEqual(t, len(sanitized), 48)
@@ -323,7 +323,7 @@ func TestTopic_NATS_Compatibility(t *testing.T) {
 			"a",
 			"a.b.c.d.e.f.g",
 		}
-		
+
 		for _, subject := range validSubjects {
 			topic := topic.Topic(subject)
 			assert.Equal(t, subject, string(topic))
@@ -334,9 +334,9 @@ func TestTopic_NATS_Compatibility(t *testing.T) {
 		// Test that topics can be used directly as NATS subjects
 		topic := topic.Topic("user.events")
 		subject := string(topic)
-		
+
 		assert.Equal(t, "user.events", subject)
-		assert.NotContains(t, subject, " ") // No spaces
+		assert.NotContains(t, subject, " ")  // No spaces
 		assert.NotContains(t, subject, "\t") // No tabs
 		assert.NotContains(t, subject, "\n") // No newlines
 	})

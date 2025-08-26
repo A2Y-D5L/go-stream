@@ -44,8 +44,8 @@ func WithBufferSize(n int) Option           { return func(o *Options) { o.Buffer
 func WithBackpressure(p BackpressurePolicy) Option {
 	return func(o *Options) { o.Backpressure = p }
 }
-func WithAckPolicy(p AckPolicy) Option                 { return func(o *Options) { o.AckPolicy = p } }
-func WithMaxDeliver(n int) Option                      { return func(o *Options) { o.MaxDeliver = n } }
+func WithAckPolicy(p AckPolicy) Option { return func(o *Options) { o.AckPolicy = p } }
+func WithMaxDeliver(n int) Option      { return func(o *Options) { o.MaxDeliver = n } }
 func WithExponentialBackoff(initial time.Duration, steps int, factor float64) Option {
 	seq := make([]time.Duration, 0, steps)
 	cur := initial
@@ -55,9 +55,9 @@ func WithExponentialBackoff(initial time.Duration, steps int, factor float64) Op
 	}
 	return func(o *Options) { o.Backoff = seq }
 }
-func WithDurable(name string) Option   { return func(o *Options) { o.Durable = name } }
+func WithDurable(name string) Option { return func(o *Options) { o.Durable = name } }
 func WithStartAt(pos StartPosition) Option {
 	return func(o *Options) { o.StartAt = pos }
 }
 func WithStartTime(t time.Time) Option { return func(o *Options) { o.StartTime = t } }
-func WithDLQ(t topic.Topic) Option           { return func(o *Options) { o.DLQ = t } }
+func WithDLQ(t topic.Topic) Option     { return func(o *Options) { o.DLQ = t } }

@@ -122,7 +122,7 @@ func TestRegistry_Exists(t *testing.T) {
 	registry := NewRegistry()
 
 	topic := Topic("test.topic")
-	
+
 	if registry.Exists(topic) {
 		t.Error("Topic should not exist before registration")
 	}

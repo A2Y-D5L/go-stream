@@ -423,7 +423,6 @@ func BenchmarkContext_Value(b *testing.B) {
 }
 
 func BenchmarkContext_MultipleValues(b *testing.B) {
-
 	for b.Loop() {
 		ctx := context.Background()
 		ctx = context.WithValue(ctx, requestIDKey, "req-123")

@@ -272,7 +272,7 @@ func TestRequest_MultipleResponders(t *testing.T) {
 	var subs []*nats.Subscription
 	for i := 0; i < 3; i++ {
 		responderID := i
-		sub, err := helpers.TestResponder(s, 
+		sub, err := helpers.TestResponder(s,
 			topic.Topic("test.request.multiple"),
 			func(data []byte) ([]byte, error) {
 				return []byte(fmt.Sprintf("response from responder %d", responderID)), nil
@@ -398,7 +398,7 @@ func TestRequestJSON_NilResponse(t *testing.T) {
 	s := helpers.CreateTestStream(t)
 
 	// Set up a responder that returns empty JSON response
-	sub, err := helpers.TestJSONResponder(s, 
+	sub, err := helpers.TestJSONResponder(s,
 		topic.Topic("test.request.json.nil"),
 		func(data []byte) (any, error) {
 			// Return empty map which will marshal to empty JSON object

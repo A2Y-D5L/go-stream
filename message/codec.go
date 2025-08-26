@@ -12,10 +12,8 @@ type Codec interface {
 // jsonCodec implements Codec using the stdlib encoding/json.
 type jsonCodec struct{}
 
-func (jsonCodec) Encode(v any) ([]byte, error)               { return json.Marshal(v) }
-func (jsonCodec) Decode(b []byte, v any) error               { return json.Unmarshal(b, v) }
-func (jsonCodec) ContentType() string                        { return "application/json" }
+func (jsonCodec) Encode(v any) ([]byte, error) { return json.Marshal(v) }
+func (jsonCodec) Decode(b []byte, v any) error { return json.Unmarshal(b, v) }
+func (jsonCodec) ContentType() string          { return "application/json" }
 
-var (
-	JSONCodec Codec = jsonCodec{}
-)
+var JSONCodec Codec = jsonCodec{}

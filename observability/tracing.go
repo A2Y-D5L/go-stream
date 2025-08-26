@@ -39,22 +39,22 @@ const (
 type Span interface {
 	// SetName sets the span name
 	SetName(name string)
-	
+
 	// SetAttribute sets a span attribute
 	SetAttribute(key string, value interface{})
-	
+
 	// SetStatus sets the span status
 	SetStatus(status SpanStatus, description string)
-	
+
 	// AddEvent adds an event to the span
 	AddEvent(name string, attributes map[string]interface{})
-	
+
 	// End completes the span
 	End()
-	
+
 	// Context returns the span context
 	Context() SpanContext
-	
+
 	// IsRecording returns true if the span is recording
 	IsRecording() bool
 }
@@ -70,10 +70,10 @@ type SpanContext struct {
 type Tracer interface {
 	// Start creates a new span
 	Start(ctx context.Context, operationName string, opts ...SpanOption) (context.Context, Span)
-	
+
 	// Extract extracts span context from a carrier
 	Extract(ctx context.Context, carrier map[string]string) (context.Context, error)
-	
+
 	// Inject injects span context into a carrier
 	Inject(ctx context.Context, carrier map[string]string) error
 }
@@ -175,17 +175,17 @@ func (s *InMemorySpan) SetStatus(status SpanStatus, description string) {
 func (s *InMemorySpan) AddEvent(name string, attributes map[string]interface{}) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	event := SpanEvent{
 		Name:       name,
 		Timestamp:  time.Now(),
 		Attributes: make(map[string]interface{}),
 	}
-	
+
 	for k, v := range attributes {
 		event.Attributes[k] = v
 	}
-	
+
 	s.events = append(s.events, event)
 }
 
@@ -193,7 +193,7 @@ func (s *InMemorySpan) AddEvent(name string, attributes map[string]interface{}) 
 func (s *InMemorySpan) End() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	if !s.ended {
 		s.endTime = time.Now()
 		s.ended = true
@@ -233,31 +233,31 @@ func (t *InMemoryTracer) Start(ctx context.Context, operationName string, opts .
 		Kind:       SpanKindInternal,
 		Attributes: make(map[string]interface{}),
 	}
-	
+
 	for _, opt := range opts {
 		opt(config)
 	}
-	
+
 	spanContext := SpanContext{
 		TraceID: generateTraceID(),
 		SpanID:  generateSpanID(),
 		Flags:   0,
 	}
-	
+
 	span := NewInMemorySpan(operationName, spanContext, config.Kind)
-	
+
 	// Set initial attributes
 	for k, v := range config.Attributes {
 		span.SetAttribute(k, v)
 	}
-	
+
 	t.mu.Lock()
 	t.spans[spanContext.SpanID] = span
 	t.mu.Unlock()
-	
+
 	// Store span in context
 	ctx = context.WithValue(ctx, spanContextKey{}, spanContext)
-	
+
 	return ctx, span
 }
 
@@ -267,18 +267,18 @@ func (t *InMemoryTracer) Extract(ctx context.Context, carrier map[string]string)
 	if !exists {
 		return ctx, nil
 	}
-	
+
 	spanID, exists := carrier["span-id"]
 	if !exists {
 		return ctx, nil
 	}
-	
+
 	spanContext := SpanContext{
 		TraceID: traceID,
 		SpanID:  spanID,
 		Flags:   0,
 	}
-	
+
 	return context.WithValue(ctx, spanContextKey{}, spanContext), nil
 }
 
@@ -288,10 +288,10 @@ func (t *InMemoryTracer) Inject(ctx context.Context, carrier map[string]string) 
 	if !ok {
 		return fmt.Errorf("no span context found in context")
 	}
-	
+
 	carrier["trace-id"] = spanCtx.TraceID
 	carrier["span-id"] = spanCtx.SpanID
-	
+
 	return nil
 }
 
@@ -299,7 +299,7 @@ func (t *InMemoryTracer) Inject(ctx context.Context, carrier map[string]string) 
 func (t *InMemoryTracer) GetSpans() map[string]*InMemorySpan {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	
+
 	spans := make(map[string]*InMemorySpan)
 	for k, v := range t.spans {
 		spans[k] = v

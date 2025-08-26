@@ -46,7 +46,9 @@ func WithReconnectWait(min time.Duration) Option { return func(c *config) { c.Re
 func WithDrainTimeout(d time.Duration) Option { return func(c *config) { c.DrainTimeout = d } }
 
 // WithServerReadyTimeout sets how long to wait for the embedded server to be ready.
-func WithServerReadyTimeout(d time.Duration) Option { return func(c *config) { c.ServerReadyTimeout = d } }
+func WithServerReadyTimeout(d time.Duration) Option {
+	return func(c *config) { c.ServerReadyTimeout = d }
+}
 
 // WithDisableJetStream disables JetStream (useful for testing).
 func WithDisableJetStream() Option { return func(c *config) { c.DisableJetStream = true } }

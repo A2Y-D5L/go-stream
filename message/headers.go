@@ -12,7 +12,7 @@ type HeaderKey string
 // Standard header keys
 const (
 	HeaderContentType     HeaderKey = "content-type"
-	HeaderContentEncoding HeaderKey = "content-encoding" 
+	HeaderContentEncoding HeaderKey = "content-encoding"
 	HeaderTimestamp       HeaderKey = "timestamp"
 	HeaderMessageID       HeaderKey = "message-id"
 	HeaderCorrelationID   HeaderKey = "correlation-id"

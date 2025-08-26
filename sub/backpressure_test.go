@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-
 type SlowSubscriber struct {
 	delay time.Duration
 	count int64

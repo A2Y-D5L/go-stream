@@ -192,7 +192,7 @@ func (og *OnceGroup) Do(key string, f func()) {
 		og.onces[key] = once
 	}
 	og.mu.Unlock()
-	
+
 	once.Do(f)
 }
 
@@ -254,7 +254,7 @@ func (tm *TimeoutMutex) LockWithTimeout(timeout time.Duration) bool {
 	tm.init()
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
-	
+
 	select {
 	case <-tm.ch:
 		return true
@@ -303,7 +303,7 @@ func (s *Semaphore) TryAcquire() bool {
 func (s *Semaphore) AcquireWithTimeout(timeout time.Duration) bool {
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
-	
+
 	select {
 	case s.ch <- struct{}{}:
 		return true

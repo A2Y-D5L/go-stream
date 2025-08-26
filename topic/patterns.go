@@ -55,12 +55,12 @@ func ValidatePattern(pattern string) error {
 		if token == "" && i < len(tokens)-1 {
 			return ErrInvalidName
 		}
-		
+
 		// > can only be at the end
 		if strings.Contains(token, ">") && i != len(tokens)-1 {
 			return ErrInvalidName
 		}
-		
+
 		// > must be the entire token
 		if strings.Contains(token, ">") && token != ">" {
 			return ErrInvalidName
@@ -74,11 +74,11 @@ func ValidatePattern(pattern string) error {
 func convertToRegex(pattern string) string {
 	// Escape regex special characters except our wildcards
 	escaped := regexp.QuoteMeta(pattern)
-	
+
 	// Replace escaped wildcards with regex equivalents
 	escaped = strings.ReplaceAll(escaped, "\\*", "[^.]+")
 	escaped = strings.ReplaceAll(escaped, "\\>", ".*")
-	
+
 	// Anchor the pattern
 	return "^" + escaped + "$"
 }

@@ -15,8 +15,8 @@ import (
 // StreamPublisher implements Publisher using a NATS connection.
 // It provides the core publishing functionality for the streaming system.
 type StreamPublisher struct {
-	nc          *nats.Conn
-	healthCheck func(context.Context) error
+	nc           *nats.Conn
+	healthCheck  func(context.Context) error
 	flushTimeout time.Duration
 }
 
@@ -34,7 +34,7 @@ func (sp *StreamPublisher) Publish(ctx context.Context, t topic.Topic, msg messa
 	if err := sp.healthCheck(ctx); err != nil {
 		return err
 	}
-	
+
 	cfg := &config{}
 	for _, opt := range opts {
 		opt(cfg)
@@ -88,7 +88,7 @@ func (sp *StreamPublisher) Request(
 	if err := sp.healthCheck(ctx); err != nil {
 		return message.Message{}, err
 	}
-	
+
 	cfg := &config{}
 	for _, opt := range opts {
 		opt(cfg)

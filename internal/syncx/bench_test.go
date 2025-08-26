@@ -15,13 +15,13 @@ func BenchmarkWorkerPool_Submit(b *testing.B) {
 		QueueSize: 1000,
 		Metrics:   false,
 	})
-	
+
 	err := wp.Start()
 	if err != nil {
 		b.Fatalf("Failed to start worker pool: %v", err)
 	}
 	defer wp.Stop(context.Background())
-	
+
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -38,13 +38,13 @@ func BenchmarkWorkerPool_SubmitWithWork(b *testing.B) {
 		QueueSize: 1000,
 		Metrics:   false,
 	})
-	
+
 	err := wp.Start()
 	if err != nil {
 		b.Fatalf("Failed to start worker pool: %v", err)
 	}
 	defer wp.Stop(context.Background())
-	
+
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -61,7 +61,7 @@ func BenchmarkWorkerPool_SubmitWithWork(b *testing.B) {
 func BenchmarkMultiError_Add(b *testing.B) {
 	me := NewMultiError()
 	err := context.Canceled
-	
+
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -73,12 +73,12 @@ func BenchmarkMultiError_Add(b *testing.B) {
 func BenchmarkMultiError_AddConcurrent(b *testing.B) {
 	me := NewMultiError()
 	err := context.Canceled
-	
+
 	b.ResetTimer()
-	
+
 	var wg sync.WaitGroup
 	numGoroutines := 100
-	
+
 	for i := 0; i < numGoroutines; i++ {
 		wg.Add(1)
 		go func() {
@@ -88,7 +88,7 @@ func BenchmarkMultiError_AddConcurrent(b *testing.B) {
 			}
 		}()
 	}
-	
+
 	wg.Wait()
 }
 
@@ -96,7 +96,7 @@ func BenchmarkMultiError_AddConcurrent(b *testing.B) {
 
 func BenchmarkBoundedQueue_Push(b *testing.B) {
 	q := NewBoundedQueue(1000, OverflowDropOldest)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		q.Push(i)
@@ -105,12 +105,12 @@ func BenchmarkBoundedQueue_Push(b *testing.B) {
 
 func BenchmarkBoundedQueue_Pop(b *testing.B) {
 	q := NewBoundedQueue(1000, OverflowReject)
-	
+
 	// Pre-fill queue
 	for i := 0; i < 1000; i++ {
 		q.Push(i)
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		q.Pop()
@@ -125,7 +125,7 @@ func BenchmarkBoundedQueue_Pop(b *testing.B) {
 
 func BenchmarkBoundedQueue_PushPop(b *testing.B) {
 	q := NewBoundedQueue(100, OverflowReject)
-	
+
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		i := 0
@@ -142,7 +142,7 @@ func BenchmarkBoundedQueue_PushPop(b *testing.B) {
 
 func BenchmarkPriorityQueue_Push(b *testing.B) {
 	pq := NewPriorityQueue()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		pq.Push(i, i%100)
@@ -151,12 +151,12 @@ func BenchmarkPriorityQueue_Push(b *testing.B) {
 
 func BenchmarkPriorityQueue_Pop(b *testing.B) {
 	pq := NewPriorityQueue()
-	
+
 	// Pre-fill queue
 	for i := 0; i < 1000; i++ {
 		pq.Push(i, i%100)
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		pq.Pop()
@@ -173,7 +173,7 @@ func BenchmarkPriorityQueue_Pop(b *testing.B) {
 
 func BenchmarkAtomicBool_Load(b *testing.B) {
 	ab := NewAtomicBool(true)
-	
+
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -184,7 +184,7 @@ func BenchmarkAtomicBool_Load(b *testing.B) {
 
 func BenchmarkAtomicBool_Store(b *testing.B) {
 	ab := NewAtomicBool(false)
-	
+
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -195,7 +195,7 @@ func BenchmarkAtomicBool_Store(b *testing.B) {
 
 func BenchmarkAtomicBool_CompareAndSwap(b *testing.B) {
 	ab := NewAtomicBool(false)
-	
+
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -207,7 +207,7 @@ func BenchmarkAtomicBool_CompareAndSwap(b *testing.B) {
 
 func BenchmarkAtomicCounter_Inc(b *testing.B) {
 	ac := NewAtomicCounter(0)
-	
+
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -218,7 +218,7 @@ func BenchmarkAtomicCounter_Inc(b *testing.B) {
 
 func BenchmarkAtomicCounter_Add(b *testing.B) {
 	ac := NewAtomicCounter(0)
-	
+
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -231,7 +231,7 @@ func BenchmarkAtomicCounter_Add(b *testing.B) {
 
 func BenchmarkSemaphore_AcquireRelease(b *testing.B) {
 	sem := NewSemaphore(10)
-	
+
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -244,7 +244,7 @@ func BenchmarkSemaphore_AcquireRelease(b *testing.B) {
 
 func BenchmarkTimeoutMutex_LockUnlock(b *testing.B) {
 	tm := NewTimeoutMutex()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		tm.Lock()
@@ -254,7 +254,7 @@ func BenchmarkTimeoutMutex_LockUnlock(b *testing.B) {
 
 func BenchmarkTimeoutMutex_TryLock(b *testing.B) {
 	tm := NewTimeoutMutex()
-	
+
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -270,7 +270,7 @@ func BenchmarkTimeoutMutex_TryLock(b *testing.B) {
 func BenchmarkMergeContexts_Two(b *testing.B) {
 	ctx1 := context.Background()
 	ctx2 := context.Background()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		merged, cancel := MergeContexts(ctx1, ctx2)
@@ -284,7 +284,7 @@ func BenchmarkMergeContexts_Five(b *testing.B) {
 	for i := range ctxs {
 		ctxs[i] = context.Background()
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		merged, cancel := MergeContexts(ctxs...)
@@ -297,7 +297,7 @@ func BenchmarkMergeContexts_Five(b *testing.B) {
 
 func BenchmarkStdMutex_LockUnlock(b *testing.B) {
 	var mu sync.Mutex
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		mu.Lock()
@@ -307,7 +307,7 @@ func BenchmarkStdMutex_LockUnlock(b *testing.B) {
 
 func BenchmarkStdRWMutex_RLockRUnlock(b *testing.B) {
 	var mu sync.RWMutex
-	
+
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {

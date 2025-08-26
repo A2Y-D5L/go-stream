@@ -40,7 +40,7 @@ func NewBoundedQueue(capacity int, policy OverflowPolicy) *BoundedQueue {
 	if capacity <= 0 {
 		capacity = 100
 	}
-	
+
 	bq := &BoundedQueue{
 		items:    make([]interface{}, 0, capacity),
 		capacity: capacity,
@@ -54,17 +54,17 @@ func NewBoundedQueue(capacity int, policy OverflowPolicy) *BoundedQueue {
 func (bq *BoundedQueue) Push(item interface{}) error {
 	bq.mu.Lock()
 	defer bq.mu.Unlock()
-	
+
 	if bq.closed {
 		return ErrQueueClosed
 	}
-	
+
 	if len(bq.items) < bq.capacity {
 		bq.items = append(bq.items, item)
 		bq.notEmpty.Signal()
 		return nil
 	}
-	
+
 	// Queue is full, apply overflow policy
 	switch bq.policy {
 	case OverflowDropOldest:
@@ -72,18 +72,18 @@ func (bq *BoundedQueue) Push(item interface{}) error {
 		bq.items = append(bq.items, item)
 		bq.notEmpty.Signal()
 		return nil
-		
+
 	case OverflowDropNewest:
 		return ErrItemDropped
-		
+
 	case OverflowReject:
 		return ErrQueueFull
-		
+
 	case OverflowBlock:
 		// For blocking, we would need a more complex implementation
 		// For now, we'll reject when full in blocking mode
 		return ErrQueueFull
-		
+
 	default:
 		return ErrUnknownOverflowPolicy
 	}
@@ -93,13 +93,13 @@ func (bq *BoundedQueue) Push(item interface{}) error {
 func (bq *BoundedQueue) Pop() (interface{}, bool) {
 	bq.mu.Lock()
 	defer bq.mu.Unlock()
-	
+
 	if len(bq.items) > 0 {
 		item := bq.items[0]
 		bq.items = bq.items[1:]
 		return item, true
 	}
-	
+
 	return nil, false
 }
 
@@ -107,15 +107,15 @@ func (bq *BoundedQueue) Pop() (interface{}, bool) {
 func (bq *BoundedQueue) PopBlocking() (interface{}, bool) {
 	bq.mu.Lock()
 	defer bq.mu.Unlock()
-	
+
 	for len(bq.items) == 0 && !bq.closed {
 		bq.notEmpty.Wait()
 	}
-	
+
 	if len(bq.items) == 0 {
 		return nil, false
 	}
-	
+
 	item := bq.items[0]
 	bq.items = bq.items[1:]
 	return item, true
@@ -125,29 +125,29 @@ func (bq *BoundedQueue) PopBlocking() (interface{}, bool) {
 func (bq *BoundedQueue) PopWithTimeout(timeout time.Duration) (interface{}, bool) {
 	bq.mu.Lock()
 	defer bq.mu.Unlock()
-	
+
 	// If items are available, return immediately
 	if len(bq.items) > 0 {
 		item := bq.items[0]
 		bq.items = bq.items[1:]
 		return item, true
 	}
-	
+
 	// If queue is closed, return false
 	if bq.closed {
 		return nil, false
 	}
-	
+
 	// Wait with timeout
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
-	
+
 	done := make(chan struct{})
 	go func() {
 		bq.notEmpty.Wait()
 		close(done)
 	}()
-	
+
 	bq.mu.Unlock()
 	select {
 	case <-done:
@@ -174,7 +174,7 @@ func (bq *BoundedQueue) Len() int {
 func (bq *BoundedQueue) Drain() []interface{} {
 	bq.mu.Lock()
 	defer bq.mu.Unlock()
-	
+
 	items := make([]interface{}, len(bq.items))
 	copy(items, bq.items)
 	bq.items = bq.items[:0]
@@ -185,7 +185,7 @@ func (bq *BoundedQueue) Drain() []interface{} {
 func (bq *BoundedQueue) Close() {
 	bq.mu.Lock()
 	defer bq.mu.Unlock()
-	
+
 	bq.closed = true
 	bq.notEmpty.Broadcast()
 }
@@ -204,8 +204,8 @@ func (bq *BoundedQueue) Capacity() int {
 
 // PriorityQueue implements a thread-safe priority queue
 type PriorityQueue struct {
-	items *priorityHeap
-	mu    sync.Mutex
+	items  *priorityHeap
+	mu     sync.Mutex
 	closed bool
 }
 
@@ -258,16 +258,16 @@ func NewPriorityQueue() *PriorityQueue {
 func (pq *PriorityQueue) Push(value interface{}, priority int) error {
 	pq.mu.Lock()
 	defer pq.mu.Unlock()
-	
+
 	if pq.closed {
 		return ErrQueueClosed
 	}
-	
+
 	item := &PriorityItem{
 		Value:    value,
 		Priority: priority,
 	}
-	
+
 	heap.Push(pq.items, item)
 	return nil
 }
@@ -276,11 +276,11 @@ func (pq *PriorityQueue) Push(value interface{}, priority int) error {
 func (pq *PriorityQueue) Pop() (interface{}, bool) {
 	pq.mu.Lock()
 	defer pq.mu.Unlock()
-	
+
 	if pq.items.Len() == 0 {
 		return nil, false
 	}
-	
+
 	item := heap.Pop(pq.items).(*PriorityItem)
 	return item.Value, true
 }
@@ -296,11 +296,11 @@ func (pq *PriorityQueue) Len() int {
 func (pq *PriorityQueue) Peek() (interface{}, int, bool) {
 	pq.mu.Lock()
 	defer pq.mu.Unlock()
-	
+
 	if pq.items.Len() == 0 {
 		return nil, 0, false
 	}
-	
+
 	item := (*pq.items)[0]
 	return item.Value, item.Priority, true
 }
@@ -309,7 +309,7 @@ func (pq *PriorityQueue) Peek() (interface{}, int, bool) {
 func (pq *PriorityQueue) Drain() []interface{} {
 	pq.mu.Lock()
 	defer pq.mu.Unlock()
-	
+
 	items := make([]interface{}, 0, pq.items.Len())
 	for pq.items.Len() > 0 {
 		item := heap.Pop(pq.items).(*PriorityItem)

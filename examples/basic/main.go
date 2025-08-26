@@ -45,9 +45,9 @@ func main() {
 
 func runSubscriber(s *stream.Stream) {
 	fmt.Println("Starting subscriber for user.events...")
-	
+
 	sub, err := stream.SubscribeJSON(s, "user.events", func(ctx context.Context, user User) error {
-		fmt.Printf("📨 Received user: ID=%s, Name=%s, Email=%s\n", 
+		fmt.Printf("📨 Received user: ID=%s, Name=%s, Email=%s\n",
 			user.ID, user.Name, user.Email)
 		return nil
 	})
@@ -60,7 +60,7 @@ func runSubscriber(s *stream.Stream) {
 
 func runPublisher(s *stream.Stream) {
 	fmt.Println("Starting publisher...")
-	
+
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 

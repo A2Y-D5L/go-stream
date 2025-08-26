@@ -106,9 +106,9 @@ func TestStream_New_ErrorCases(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "invalid port - negative",
-			opts: []client.Option{client.WithPort(-2), client.WithServerReadyTimeout(15 * time.Second), client.WithDisableJetStream()}, // -1 is valid (dynamic), -2 is not
-			wantErr: true, // Port -2 should cause an error
+			name:    "invalid port - negative",
+			opts:    []client.Option{client.WithPort(-2), client.WithServerReadyTimeout(15 * time.Second), client.WithDisableJetStream()}, // -1 is valid (dynamic), -2 is not
+			wantErr: true,                                                                                                                 // Port -2 should cause an error
 		},
 	}
 
@@ -136,7 +136,7 @@ func TestStream_Healthy(t *testing.T) {
 		s := helpers.CreateTestStream(t)
 		defer helpers.CleanupStream(t, s)
 
-		ctx, cancel := context.WithTimeout(t.Context(), 2 * time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 		defer cancel()
 
 		err := s.Healthy(ctx)
@@ -147,7 +147,7 @@ func TestStream_Healthy(t *testing.T) {
 		s := helpers.CreateTestStream(t)
 
 		// Close the stream
-		ctx, cancel := context.WithTimeout(t.Context(), 5 * time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancel()
 		err := s.Close(ctx)
 		require.NoError(t, err)
@@ -158,7 +158,7 @@ func TestStream_Healthy(t *testing.T) {
 	})
 
 	t.Run("never started stream", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(t.Context(), 2 * time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 		defer cancel()
 
 		// Create a stream object without calling New
@@ -173,7 +173,7 @@ func TestStream_Close(t *testing.T) {
 	t.Run("normal close", func(t *testing.T) {
 		s := helpers.CreateTestStream(t)
 
-		ctx, cancel := context.WithTimeout(t.Context(), 10 * time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 		defer cancel()
 
 		err := s.Close(ctx)
@@ -240,7 +240,7 @@ func TestStream_ConcurrentOperations(t *testing.T) {
 
 		for range numGoroutines {
 			go func() {
-				ctx, cancel := context.WithTimeout(t.Context(), 5 * time.Second)
+				ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 				defer cancel()
 				errChan <- s.Healthy(ctx)
 			}()
@@ -261,7 +261,7 @@ func TestStream_ConcurrentOperations(t *testing.T) {
 
 		for i := 0; i < numGoroutines; i++ {
 			go func() {
-				ctx, cancel := context.WithTimeout(t.Context(), 10 * time.Second)
+				ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 				defer cancel()
 				errChan <- s.Close(ctx)
 			}()

@@ -57,16 +57,16 @@ const (
 
 // Options holds configuration for individual topics.
 type Options struct {
-	Mode           Mode
-	Retention      Retention
-	DiscardPolicy  DiscardPolicy
-	MaxAge         time.Duration
-	MaxMessages    int64
-	MaxBytes       int64
-	MaxConsumers   int
-	Replicas       int
-	NoAck          bool
-	Duplicates     time.Duration
+	Mode          Mode
+	Retention     Retention
+	DiscardPolicy DiscardPolicy
+	MaxAge        time.Duration
+	MaxMessages   int64
+	MaxBytes      int64
+	MaxConsumers  int
+	Replicas      int
+	NoAck         bool
+	Duplicates    time.Duration
 }
 
 // Validate validates a topic name according to NATS subject naming rules

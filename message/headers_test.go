@@ -40,7 +40,7 @@ func TestHeaders_StandardHeaders(t *testing.T) {
 func TestHeaders_Manipulation(t *testing.T) {
 	t.Run("add headers", func(t *testing.T) {
 		headers := make(map[string]string)
-		
+
 		// Add headers one by one
 		headers["Content-Type"] = "application/json"
 		headers["X-Request-Id"] = "req-456"
@@ -211,13 +211,13 @@ func TestHeaders_SpecialHeaders(t *testing.T) {
 
 	t.Run("custom application headers", func(t *testing.T) {
 		customHeaders := map[string]string{
-			"X-User-Id":       "user-123",
-			"X-Tenant-Id":     "tenant-456",
-			"X-Version":       "v1.2.3",
-			"X-Client":        "mobile-app",
-			"X-Feature-Flag":  "new-ui-enabled",
-			"X-Rate-Limit":    "1000",
-			"X-Timestamp":     "2024-01-01T12:00:00Z",
+			"X-User-Id":      "user-123",
+			"X-Tenant-Id":    "tenant-456",
+			"X-Version":      "v1.2.3",
+			"X-Client":       "mobile-app",
+			"X-Feature-Flag": "new-ui-enabled",
+			"X-Rate-Limit":   "1000",
+			"X-Timestamp":    "2024-01-01T12:00:00Z",
 		}
 
 		assert.Equal(t, 7, len(customHeaders))
@@ -245,10 +245,10 @@ func TestHeaders_Validation(t *testing.T) {
 
 	t.Run("whitespace in header values", func(t *testing.T) {
 		headers := map[string]string{
-			"Spaces":     "  value with spaces  ",
-			"Tabs":       "\tvalue with tabs\t",
-			"Newlines":   "value\nwith\nnewlines",
-			"Mixed":      " \t mixed whitespace \n ",
+			"Spaces":   "  value with spaces  ",
+			"Tabs":     "\tvalue with tabs\t",
+			"Newlines": "value\nwith\nnewlines",
+			"Mixed":    " \t mixed whitespace \n ",
 		}
 
 		// Whitespace should be preserved as-is
@@ -260,10 +260,10 @@ func TestHeaders_Validation(t *testing.T) {
 
 	t.Run("special characters in headers", func(t *testing.T) {
 		headers := map[string]string{
-			"Unicode":     "value with unicode: 你好世界",
-			"Symbols":     "!@#$%^&*()_+-={}[]|\\:;\"'<>?,./ ",
-			"Numbers":     "1234567890",
-			"Mixed":       "Value123!@#",
+			"Unicode": "value with unicode: 你好世界",
+			"Symbols": "!@#$%^&*()_+-={}[]|\\:;\"'<>?,./ ",
+			"Numbers": "1234567890",
+			"Mixed":   "Value123!@#",
 		}
 
 		assert.Equal(t, "value with unicode: 你好世界", headers["Unicode"])
@@ -293,7 +293,7 @@ func TestHeaders_ContextIntegration(t *testing.T) {
 	t.Run("request id propagation", func(t *testing.T) {
 		// Simulate request ID propagation through headers
 		requestID := "req-ctx-123"
-		
+
 		// Original message with request ID
 		originalHeaders := map[string]string{
 			"X-Request-Id": requestID,
@@ -319,11 +319,11 @@ func TestHeaders_ContextIntegration(t *testing.T) {
 	t.Run("trace context propagation", func(t *testing.T) {
 		// Simulate distributed tracing headers
 		traceHeaders := map[string]string{
-			"X-Trace-Id":      "trace-456",
-			"X-Span-Id":       "span-789",
-			"X-Parent-Span":   "span-123",
-			"X-Sampled":       "true",
-			"X-Priority":      "high",
+			"X-Trace-Id":    "trace-456",
+			"X-Span-Id":     "span-789",
+			"X-Parent-Span": "span-123",
+			"X-Sampled":     "true",
+			"X-Priority":    "high",
 		}
 
 		// Headers should maintain tracing context
@@ -344,7 +344,7 @@ func TestHeaders_ContextIntegration(t *testing.T) {
 
 		// Child message inherits some headers, adds others
 		childHeaders := make(map[string]string)
-		
+
 		// Inherit trace context
 		if traceId, exists := parentHeaders["X-Trace-Id"]; exists {
 			childHeaders["X-Trace-Id"] = traceId
@@ -391,10 +391,10 @@ func TestHeaders_EdgeCases(t *testing.T) {
 
 	t.Run("header key edge cases", func(t *testing.T) {
 		headers := map[string]string{
-			"":           "empty key",
-			" ":          "space key",
-			"\t":         "tab key",
-			"a":          "single char",
+			"":   "empty key",
+			" ":  "space key",
+			"\t": "tab key",
+			"a":  "single char",
 			"VERY-LONG-HEADER-NAME-WITH-MANY-WORDS-AND-DASHES": "long key",
 		}
 
@@ -414,7 +414,7 @@ func TestHeaders_EdgeCases(t *testing.T) {
 
 		// In real concurrent code, you'd need sync.RWMutex or sync.Map
 		// This test just verifies the data structure behavior
-		
+
 		// Read
 		value := headers["Shared"]
 		assert.Equal(t, "initial value", value)
@@ -434,7 +434,7 @@ func TestHeaders_EdgeCases(t *testing.T) {
 
 func BenchmarkHeaders_SetSingle(b *testing.B) {
 	headers := make(map[string]string)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		headers["Content-Type"] = "application/json"
@@ -445,7 +445,7 @@ func BenchmarkHeaders_GetSingle(b *testing.B) {
 	headers := map[string]string{
 		"Content-Type": "application/json",
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = headers["Content-Type"]
@@ -456,11 +456,11 @@ func BenchmarkHeaders_SetMultiple(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		headers := map[string]string{
-			"Content-Type":   "application/json",
-			"X-Request-Id":   "req-123",
-			"Authorization":  "Bearer token",
-			"X-Trace-Id":     "trace-456",
-			"X-User-Agent":   "go-stream/1.0",
+			"Content-Type":  "application/json",
+			"X-Request-Id":  "req-123",
+			"Authorization": "Bearer token",
+			"X-Trace-Id":    "trace-456",
+			"X-User-Agent":  "go-stream/1.0",
 		}
 		_ = headers // Use the variable
 	}
@@ -468,13 +468,13 @@ func BenchmarkHeaders_SetMultiple(b *testing.B) {
 
 func BenchmarkHeaders_CopyHeaders(b *testing.B) {
 	sourceHeaders := map[string]string{
-		"Content-Type":   "application/json",
-		"X-Request-Id":   "req-123",
-		"Authorization":  "Bearer token",
-		"X-Trace-Id":     "trace-456",
-		"X-User-Agent":   "go-stream/1.0",
+		"Content-Type":  "application/json",
+		"X-Request-Id":  "req-123",
+		"Authorization": "Bearer token",
+		"X-Trace-Id":    "trace-456",
+		"X-User-Agent":  "go-stream/1.0",
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		destHeaders := make(map[string]string)
@@ -498,16 +498,16 @@ func BenchmarkHeaders_DeleteHeader(b *testing.B) {
 
 func BenchmarkHeaders_IterateHeaders(b *testing.B) {
 	headers := map[string]string{
-		"Content-Type":   "application/json",
-		"X-Request-Id":   "req-123",
-		"Authorization":  "Bearer token",
-		"X-Trace-Id":     "trace-456",
-		"X-User-Agent":   "go-stream/1.0",
-		"X-Timestamp":    "2024-01-01T12:00:00Z",
-		"X-Version":      "v1.0.0",
-		"X-Client":       "test-client",
+		"Content-Type":  "application/json",
+		"X-Request-Id":  "req-123",
+		"Authorization": "Bearer token",
+		"X-Trace-Id":    "trace-456",
+		"X-User-Agent":  "go-stream/1.0",
+		"X-Timestamp":   "2024-01-01T12:00:00Z",
+		"X-Version":     "v1.0.0",
+		"X-Client":      "test-client",
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for k, v := range headers {

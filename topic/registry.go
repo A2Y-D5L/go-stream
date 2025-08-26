@@ -6,10 +6,8 @@ import (
 	"time"
 )
 
-var (
-	// ErrTopicNotRegistered indicates the topic is not registered in the registry
-	ErrTopicNotRegistered = errors.New("topic not registered")
-)
+// ErrTopicNotRegistered indicates the topic is not registered in the registry
+var ErrTopicNotRegistered = errors.New("topic not registered")
 
 // Registry manages topic registrations and metadata
 type Registry struct {
@@ -19,11 +17,11 @@ type Registry struct {
 
 // TopicInfo contains metadata about a registered topic
 type TopicInfo struct {
-	Topic       Topic     `json:"topic"`
-	Description string    `json:"description"`
-	Mode        Mode `json:"mode"`
-	Schema      string    `json:"schema,omitempty"`
-	CreatedAt   int64     `json:"created_at"`
+	Topic       Topic  `json:"topic"`
+	Description string `json:"description"`
+	Mode        Mode   `json:"mode"`
+	Schema      string `json:"schema,omitempty"`
+	CreatedAt   int64  `json:"created_at"`
 }
 
 // NewRegistry creates a new topic registry

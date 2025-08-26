@@ -10,23 +10,31 @@ import (
 )
 
 // Core types
-type Stream = client.Stream
-type Message = message.Message
-type Topic = topic.Topic
+type (
+	Stream  = client.Stream
+	Message = message.Message
+	Topic   = topic.Topic
+)
 
 // Constructor
-var New = client.New
-var NewTopic = topic.New
+var (
+	New      = client.New
+	NewTopic = topic.New
+)
 
 // Subscriber types
-type Subscriber = sub.Subscriber
-type SubscriberFunc = sub.SubscriberFunc
-type Subscription = sub.Subscription
+type (
+	Subscriber     = sub.Subscriber
+	SubscriberFunc = sub.SubscriberFunc
+	Subscription   = sub.Subscription
+)
 
-// Publisher types  
+// Publisher types
 type Publisher = pub.Publisher
 
 // Option types
-type StreamOption = client.Option
-type PublishOption = pub.Option
-type SubscribeOption = sub.Option
+type (
+	StreamOption    = client.Option
+	PublishOption   = pub.Option
+	SubscribeOption = sub.Option
+)

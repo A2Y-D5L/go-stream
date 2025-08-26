@@ -41,7 +41,7 @@ func TestCombined_HighLoadWithPanicRecovery(t *testing.T) {
 	})
 
 	// Subscribe with both normal and panicking subscribers
-	normalSub, err := s.Subscribe(top, normalSubscriber, 
+	normalSub, err := s.Subscribe(top, normalSubscriber,
 		sub.WithConcurrency(5),
 		sub.WithQueueGroupName("normal"))
 	require.NoError(t, err)
@@ -84,15 +84,15 @@ func TestCombined_HighLoadWithPanicRecovery(t *testing.T) {
 	t.Logf("Published %d messages in %v", numMessages, publishDuration)
 	t.Logf("Processed %d messages total", finalProcessed)
 	t.Logf("Panic subscriber handled %d messages", finalPanicCount)
-	
+
 	// Should process most messages despite some panics
-	assert.Greater(t, finalProcessed, int64(float64(numMessages)*0.8), 
+	assert.Greater(t, finalProcessed, int64(float64(numMessages)*0.8),
 		"Should process at least 80% of messages despite panics")
-	
+
 	// Panic subscriber should have handled some messages (and panicked on some)
-	assert.Greater(t, finalPanicCount, int64(50), 
+	assert.Greater(t, finalPanicCount, int64(50),
 		"Panic subscriber should have processed many messages")
-	
+
 	// System should still be functional - publish one more message
 	finalMsg := stream.Message{
 		Topic: top,

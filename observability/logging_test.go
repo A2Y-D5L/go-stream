@@ -192,7 +192,7 @@ func TestLoggerLogMethod(t *testing.T) {
 	})
 
 	ctx := context.Background()
-	logger.Log(ctx, slog.LevelInfo, "test log method", 
+	logger.Log(ctx, slog.LevelInfo, "test log method",
 		slog.String("key", "value"),
 		slog.Int("number", 42),
 	)
@@ -254,7 +254,7 @@ func TestSampling(t *testing.T) {
 
 			output := buf.String()
 			lines := strings.Split(strings.TrimSpace(output), "\n")
-			
+
 			// Should have fewer than 100 lines due to sampling
 			if len(lines) >= 100 {
 				t.Errorf("Expected sampling to reduce log count, got %d lines", len(lines))

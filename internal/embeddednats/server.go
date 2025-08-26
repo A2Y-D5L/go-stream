@@ -34,7 +34,7 @@ func (e *Server) Ready(ctx context.Context) error {
 	// Instead of relying on ReadyForConnections, try to actually connect
 	t := time.NewTicker(50 * time.Millisecond)
 	defer t.Stop()
-	
+
 	for {
 		select {
 		case <-ctx.Done():

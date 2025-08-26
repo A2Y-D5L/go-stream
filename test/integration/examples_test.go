@@ -65,8 +65,8 @@ func TestExamples_RequestReplyPattern(t *testing.T) {
 				Topic: stream.Topic(replyTo),
 				Data:  []byte("Response: " + string(msg.Data)),
 				Headers: map[string]string{
-					"Content-Type":  "text/plain",
-					"Request-ID":    msg.Headers["Request-ID"],
+					"Content-Type": "text/plain",
+					"Request-ID":   msg.Headers["Request-ID"],
 				},
 				Time: time.Now(),
 			}
@@ -174,7 +174,7 @@ func TestExamples_WorkQueuePattern(t *testing.T) {
 	worker2Count := len(worker2Jobs)
 
 	t.Logf("Work distribution: Worker1=%d, Worker2=%d", worker1Count, worker2Count)
-	
+
 	assert.Greater(t, worker1Count, 0, "Worker 1 should receive some jobs")
 	assert.Greater(t, worker2Count, 0, "Worker 2 should receive some jobs")
 	assert.Equal(t, jobCount, worker1Count+worker2Count, "All jobs should be processed")
@@ -229,7 +229,7 @@ func TestExamples_EventSourcing(t *testing.T) {
 
 	// Verify event sequence
 	require.Len(t, events, 3, "Should have received all events")
-	
+
 	assert.Equal(t, "UserCreated", events[0].Headers["Event-Type"])
 	assert.Equal(t, "UserUpdated", events[1].Headers["Event-Type"])
 	assert.Equal(t, "UserDeleted", events[2].Headers["Event-Type"])

@@ -24,7 +24,7 @@ func (me *MultiError) Add(err error) {
 	if err == nil {
 		return
 	}
-	
+
 	me.mu.Lock()
 	me.errors = append(me.errors, err)
 	me.mu.Unlock()
@@ -34,7 +34,7 @@ func (me *MultiError) Add(err error) {
 func (me *MultiError) Errors() []error {
 	me.mu.Lock()
 	defer me.mu.Unlock()
-	
+
 	result := make([]error, len(me.errors))
 	copy(result, me.errors)
 	return result
@@ -44,20 +44,20 @@ func (me *MultiError) Errors() []error {
 func (me *MultiError) Error() string {
 	me.mu.Lock()
 	defer me.mu.Unlock()
-	
+
 	if len(me.errors) == 0 {
 		return ""
 	}
-	
+
 	if len(me.errors) == 1 {
 		return me.errors[0].Error()
 	}
-	
+
 	var messages []string
 	for i, err := range me.errors {
 		messages = append(messages, fmt.Sprintf("[%d] %s", i+1, err.Error()))
 	}
-	
+
 	return fmt.Sprintf("multiple errors occurred:\n%s", strings.Join(messages, "\n"))
 }
 
@@ -94,7 +94,7 @@ func (me *MultiError) Clear() {
 func (me *MultiError) First() error {
 	me.mu.Lock()
 	defer me.mu.Unlock()
-	
+
 	if len(me.errors) == 0 {
 		return nil
 	}
@@ -105,7 +105,7 @@ func (me *MultiError) First() error {
 func (me *MultiError) Last() error {
 	me.mu.Lock()
 	defer me.mu.Unlock()
-	
+
 	if len(me.errors) == 0 {
 		return nil
 	}

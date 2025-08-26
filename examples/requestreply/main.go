@@ -62,33 +62,32 @@ func main() {
 
 func runCalculationServer(s *stream.Stream, serverID string) {
 	fmt.Printf("🖥️  Starting calculation server: %s\n", serverID)
-	
+
 	// Subscribe to calculation requests with queue group for load balancing
-	sub, err := stream.SubscribeJSON(s, "calc.requests", 
+	sub, err := stream.SubscribeJSON(s, "calc.requests",
 		func(ctx context.Context, req CalculationRequest) error {
 			response := processCalculation(req, serverID)
-			
+
 			// Send response back to the reply topic
 			replyTopic := stream.Topic(fmt.Sprintf("calc.responses.%s", req.RequestID))
 			if err := s.PublishJSON(ctx, replyTopic, response); err != nil {
 				log.Printf("❌ [%s] Failed to send response: %v", serverID, err)
 				return err
 			}
-			
-			fmt.Printf("🔢 [%s] Processed: %.2f %s %.2f = %.2f (req: %s)\n", 
+
+			fmt.Printf("🔢 [%s] Processed: %.2f %s %.2f = %.2f (req: %s)\n",
 				serverID, req.A, req.Operation, req.B, response.Result, req.RequestID)
 			return nil
 		},
 		stream.WithQueueGroupName("calc-servers"), // Load balancing
 		stream.WithConcurrency(2),                 // Process 2 requests concurrently per server
 	)
-	
 	if err != nil {
 		log.Printf("❌ [%s] Subscribe error: %v", serverID, err)
 		return
 	}
 	defer sub.Stop()
-	
+
 	// Keep the server running
 	select {}
 }
@@ -98,10 +97,10 @@ func processCalculation(req CalculationRequest, serverID string) CalculationResp
 		RequestID: req.RequestID,
 		ServerID:  serverID,
 	}
-	
+
 	// Simulate some processing time
 	time.Sleep(time.Duration(rand.Intn(100)) * time.Millisecond)
-	
+
 	switch strings.ToLower(req.Operation) {
 	case "add":
 		response.Result = req.A + req.B
@@ -116,19 +115,19 @@ func processCalculation(req CalculationRequest, serverID string) CalculationResp
 	default:
 		response.Error = fmt.Sprintf("unknown operation: %s", req.Operation)
 	}
-	
+
 	return response
 }
 
 func runClient(s *stream.Stream) {
 	fmt.Println("📞 Starting client...")
-	
+
 	operations := []string{"add", "multiply", "divide"}
 	requestID := 1
-	
+
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
-	
+
 	for range ticker.C {
 		// Create random calculation request
 		op := operations[rand.Intn(len(operations))]
@@ -137,7 +136,7 @@ func runClient(s *stream.Stream) {
 		if op == "divide" && b == 0 {
 			b = 1 // Avoid division by zero
 		}
-		
+
 		reqID := fmt.Sprintf("req-%d", requestID)
 		request := CalculationRequest{
 			Operation: op,
@@ -145,10 +144,10 @@ func runClient(s *stream.Stream) {
 			B:         b,
 			RequestID: reqID,
 		}
-		
+
 		// Send request and wait for response
 		go sendRequestAndWaitForResponse(s, request)
-		
+
 		requestID++
 	}
 }
@@ -156,10 +155,10 @@ func runClient(s *stream.Stream) {
 func sendRequestAndWaitForResponse(s *stream.Stream, req CalculationRequest) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	// Subscribe to the response topic before sending request
 	responseTopic := stream.Topic(fmt.Sprintf("calc.responses.%s", req.RequestID))
-	
+
 	responseChan := make(chan CalculationResponse, 1)
 	sub, err := stream.SubscribeJSON(s, responseTopic,
 		func(ctx context.Context, resp CalculationResponse) error {
@@ -172,24 +171,24 @@ func sendRequestAndWaitForResponse(s *stream.Stream, req CalculationRequest) {
 		return
 	}
 	defer sub.Stop()
-	
+
 	// Send the request
-	fmt.Printf("📤 Sending request: %.2f %s %.2f (req: %s)\n", 
+	fmt.Printf("📤 Sending request: %.2f %s %.2f (req: %s)\n",
 		req.A, req.Operation, req.B, req.RequestID)
-	
+
 	if err := s.PublishJSON(ctx, "calc.requests", req); err != nil {
 		log.Printf("❌ Failed to send request: %v", err)
 		return
 	}
-	
+
 	// Wait for response or timeout
 	select {
 	case response := <-responseChan:
 		if response.Error != "" {
-			fmt.Printf("❌ Response: %s (server: %s, req: %s)\n", 
+			fmt.Printf("❌ Response: %s (server: %s, req: %s)\n",
 				response.Error, response.ServerID, response.RequestID)
 		} else {
-			fmt.Printf("✅ Response: %.2f (server: %s, req: %s)\n", 
+			fmt.Printf("✅ Response: %.2f (server: %s, req: %s)\n",
 				response.Result, response.ServerID, response.RequestID)
 		}
 	case <-ctx.Done():

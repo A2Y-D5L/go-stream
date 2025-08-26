@@ -26,8 +26,8 @@ func TestMessage_JSONSerialization(t *testing.T) {
 
 	t.Run("serialize complete message", func(t *testing.T) {
 		msg := Message{
-			Topic:   "user.created",
-			Data:    []byte(`{"id": 123, "name": "John"}`),
+			Topic: "user.created",
+			Data:  []byte(`{"id": 123, "name": "John"}`),
 			Headers: map[string]string{
 				"Content-Type": "application/json",
 				"X-Request-Id": "req-123",
@@ -374,7 +374,7 @@ func TestMessage_TimeHandling(t *testing.T) {
 		msgUTC := Message{Topic: "utc", Data: []byte("data"), Time: utc}
 		msgEST := Message{Topic: "est", Data: []byte("data"), Time: est}
 
-		assert.True(t, msgUTC.Time.Equal(msgEST.Time)) // Same instant
+		assert.True(t, msgUTC.Time.Equal(msgEST.Time))                 // Same instant
 		assert.NotEqual(t, msgUTC.Time.String(), msgEST.Time.String()) // Different string representation
 	})
 }

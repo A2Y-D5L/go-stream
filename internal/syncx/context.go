@@ -12,16 +12,16 @@ func MergeContexts(ctxs ...context.Context) (context.Context, context.CancelFunc
 	if len(ctxs) == 0 {
 		return context.WithCancel(context.Background())
 	}
-	
+
 	if len(ctxs) == 1 {
 		return context.WithCancel(ctxs[0])
 	}
-	
+
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	go func() {
 		defer cancel()
-		
+
 		cases := make([]reflect.SelectCase, len(ctxs))
 		for i, c := range ctxs {
 			cases[i] = reflect.SelectCase{
@@ -29,24 +29,24 @@ func MergeContexts(ctxs ...context.Context) (context.Context, context.CancelFunc
 				Chan: reflect.ValueOf(c.Done()),
 			}
 		}
-		
+
 		reflect.Select(cases)
 	}()
-	
+
 	return ctx, cancel
 }
 
 // WithTimeoutFallback creates a context with timeout and fallback behavior
 func WithTimeoutFallback(parent context.Context, timeout time.Duration, fallback func()) (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithTimeout(parent, timeout)
-	
+
 	go func() {
 		<-ctx.Done()
 		if ctx.Err() == context.DeadlineExceeded && fallback != nil {
 			fallback()
 		}
 	}()
-	
+
 	return ctx, cancel
 }
 
@@ -55,14 +55,14 @@ func WithValues(parent context.Context, keyValues ...interface{}) context.Contex
 	if len(keyValues)%2 != 0 {
 		panic("keyValues must contain an even number of elements")
 	}
-	
+
 	ctx := parent
 	for i := 0; i < len(keyValues); i += 2 {
 		key := keyValues[i]
 		value := keyValues[i+1]
 		ctx = context.WithValue(ctx, key, value)
 	}
-	
+
 	return ctx
 }
 
@@ -90,12 +90,12 @@ func (wgc *WaitGroupWithContext) Done() {
 // Wait waits for the WaitGroup counter to reach zero or for context cancellation
 func (wgc *WaitGroupWithContext) Wait() error {
 	done := make(chan struct{})
-	
+
 	go func() {
 		wgc.wg.Wait()
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
 		return nil
@@ -108,14 +108,14 @@ func (wgc *WaitGroupWithContext) Wait() error {
 func (wgc *WaitGroupWithContext) WaitWithTimeout(timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(wgc.ctx, timeout)
 	defer cancel()
-	
+
 	done := make(chan struct{})
-	
+
 	go func() {
 		wgc.wg.Wait()
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
 		return nil
@@ -144,11 +144,11 @@ func NewBarrier(n int) *Barrier {
 func (b *Barrier) Wait() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	
+
 	if b.released {
 		return
 	}
-	
+
 	b.count++
 	if b.count == b.n {
 		b.released = true
@@ -163,12 +163,12 @@ func (b *Barrier) Wait() {
 // WaitWithContext waits for the barrier with context cancellation
 func (b *Barrier) WaitWithContext(ctx context.Context) error {
 	done := make(chan struct{})
-	
+
 	go func() {
 		b.Wait()
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
 		return nil
@@ -181,7 +181,7 @@ func (b *Barrier) WaitWithContext(ctx context.Context) error {
 func (b *Barrier) Reset() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	
+
 	b.count = 0
 	b.released = false
 }
@@ -225,7 +225,7 @@ func (l *Latch) AwaitWithContext(ctx context.Context) error {
 func (l *Latch) AwaitWithTimeout(timeout time.Duration) error {
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
-	
+
 	select {
 	case <-l.done:
 		return nil

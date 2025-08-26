@@ -32,19 +32,19 @@ type MetricsCollector interface {
 	// Counter operations
 	IncrementCounter(name string, labels map[string]string)
 	IncrementCounterBy(name string, value float64, labels map[string]string)
-	
+
 	// Gauge operations
 	SetGauge(name string, value float64, labels map[string]string)
 	IncrementGauge(name string, labels map[string]string)
 	DecrementGauge(name string, labels map[string]string)
-	
+
 	// Histogram operations
 	RecordHistogram(name string, value float64, labels map[string]string)
-	
+
 	// Metric retrieval
 	GetMetrics() []Metric
 	GetMetric(name string, labels map[string]string) (*Metric, bool)
-	
+
 	// Lifecycle
 	Start(ctx context.Context) error
 	Stop(ctx context.Context) error
@@ -73,7 +73,7 @@ func (c *InMemoryMetricsCollector) IncrementCounter(name string, labels map[stri
 func (c *InMemoryMetricsCollector) IncrementCounterBy(name string, value float64, labels map[string]string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	key := c.metricKey(name, labels)
 	metric, exists := c.metrics[key]
 	if !exists {
@@ -86,7 +86,7 @@ func (c *InMemoryMetricsCollector) IncrementCounterBy(name string, value float64
 		}
 		c.metrics[key] = metric
 	}
-	
+
 	metric.Value += value
 	metric.Timestamp = time.Now()
 }
@@ -95,7 +95,7 @@ func (c *InMemoryMetricsCollector) IncrementCounterBy(name string, value float64
 func (c *InMemoryMetricsCollector) SetGauge(name string, value float64, labels map[string]string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	key := c.metricKey(name, labels)
 	metric := &Metric{
 		Name:      name,
@@ -111,7 +111,7 @@ func (c *InMemoryMetricsCollector) SetGauge(name string, value float64, labels m
 func (c *InMemoryMetricsCollector) IncrementGauge(name string, labels map[string]string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	key := c.metricKey(name, labels)
 	metric, exists := c.metrics[key]
 	if !exists {
@@ -124,7 +124,7 @@ func (c *InMemoryMetricsCollector) IncrementGauge(name string, labels map[string
 		}
 		c.metrics[key] = metric
 	}
-	
+
 	metric.Value++
 	metric.Timestamp = time.Now()
 }
@@ -133,7 +133,7 @@ func (c *InMemoryMetricsCollector) IncrementGauge(name string, labels map[string
 func (c *InMemoryMetricsCollector) DecrementGauge(name string, labels map[string]string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	key := c.metricKey(name, labels)
 	metric, exists := c.metrics[key]
 	if !exists {
@@ -146,7 +146,7 @@ func (c *InMemoryMetricsCollector) DecrementGauge(name string, labels map[string
 		}
 		c.metrics[key] = metric
 	}
-	
+
 	metric.Value--
 	metric.Timestamp = time.Now()
 }
@@ -155,7 +155,7 @@ func (c *InMemoryMetricsCollector) DecrementGauge(name string, labels map[string
 func (c *InMemoryMetricsCollector) RecordHistogram(name string, value float64, labels map[string]string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	key := c.metricKey(name, labels)
 	metric := &Metric{
 		Name:      name,
@@ -171,7 +171,7 @@ func (c *InMemoryMetricsCollector) RecordHistogram(name string, value float64, l
 func (c *InMemoryMetricsCollector) GetMetrics() []Metric {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	metrics := make([]Metric, 0, len(c.metrics))
 	for _, metric := range c.metrics {
 		metrics = append(metrics, *metric)
@@ -183,13 +183,13 @@ func (c *InMemoryMetricsCollector) GetMetrics() []Metric {
 func (c *InMemoryMetricsCollector) GetMetric(name string, labels map[string]string) (*Metric, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	key := c.metricKey(name, labels)
 	metric, exists := c.metrics[key]
 	if !exists {
 		return nil, false
 	}
-	
+
 	// Return a copy to prevent external modification
 	return &Metric{
 		Name:      metric.Name,
@@ -204,7 +204,7 @@ func (c *InMemoryMetricsCollector) GetMetric(name string, labels map[string]stri
 func (c *InMemoryMetricsCollector) Start(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	c.running = true
 	return nil
 }
@@ -213,7 +213,7 @@ func (c *InMemoryMetricsCollector) Start(ctx context.Context) error {
 func (c *InMemoryMetricsCollector) Stop(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	c.running = false
 	return nil
 }
@@ -221,11 +221,10 @@ func (c *InMemoryMetricsCollector) Stop(ctx context.Context) error {
 // metricKey generates a unique key for a metric based on name and labels
 func (c *InMemoryMetricsCollector) metricKey(name string, labels map[string]string) string {
 	key := name
-	if labels != nil {
-		for k, v := range labels {
-			key += ":" + k + "=" + v
-		}
+	for k, v := range labels {
+		key += ":" + k + "=" + v
 	}
+
 	return key
 }
 
@@ -234,7 +233,7 @@ func copyLabels(labels map[string]string) map[string]string {
 	if labels == nil {
 		return nil
 	}
-	
+
 	copy := make(map[string]string, len(labels))
 	for k, v := range labels {
 		copy[k] = v
@@ -286,7 +285,7 @@ func (m *StreamMetrics) RecordMessageReceived(topic string) {
 // RecordMessageProcessingTime records message processing time
 func (m *StreamMetrics) RecordMessageProcessingTime(topic string, duration time.Duration) {
 	labels := map[string]string{"topic": topic}
-	m.collector.RecordHistogram("stream_message_processing_duration_ms", 
+	m.collector.RecordHistogram("stream_message_processing_duration_ms",
 		float64(duration.Nanoseconds())/1e6, labels)
 }
 

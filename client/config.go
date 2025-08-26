@@ -12,25 +12,25 @@ import (
 // config holds all tunables for the Stream (via functional options).
 type config struct {
 	// Server
-	Host                string
-	Port                int // -1 selects a random free port
-	TLS                 *tls.Config
-	StoreDir            string
-	MaxPayload          int
-	ServerReadyTimeout  time.Duration
+	Host                  string
+	Port                  int // -1 selects a random free port
+	TLS                   *tls.Config
+	StoreDir              string
+	MaxPayload            int
+	ServerReadyTimeout    time.Duration
 	ServerShutdownMaxWait time.Duration
 
 	// Client
-	ClientName         string
-	ConnectTimeout     time.Duration
+	ClientName          string
+	ConnectTimeout      time.Duration
 	ConnectFlushTimeout time.Duration
-	ReconnectWaitMin   time.Duration
+	ReconnectWaitMin    time.Duration
 
 	// Defaults & behavior
-	DefaultTopicMode  topic.Mode
-	DefaultCodec      message.Codec
-	RequestIDHeader   string
-	DrainTimeout      time.Duration
+	DefaultTopicMode topic.Mode
+	DefaultCodec     message.Codec
+	RequestIDHeader  string
+	DrainTimeout     time.Duration
 
 	// JetStream settings
 	DisableJetStream bool // For testing purposes

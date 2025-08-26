@@ -67,7 +67,7 @@ func TestPattern_Match(t *testing.T) {
 
 		match := pattern.Match(Topic(test.topic))
 		if match != test.match {
-			t.Errorf("Pattern %s vs topic %s: expected %v, got %v", 
+			t.Errorf("Pattern %s vs topic %s: expected %v, got %v",
 				test.pattern, test.topic, test.match, match)
 		}
 	}
@@ -115,7 +115,7 @@ func TestValidatePattern(t *testing.T) {
 
 func TestMatchMany(t *testing.T) {
 	patterns := []*Pattern{}
-	
+
 	pattern1, _ := NewPattern("events.*")
 	pattern2, _ := NewPattern("commands.*")
 	patterns = append(patterns, pattern1, pattern2)

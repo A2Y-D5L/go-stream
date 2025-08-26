@@ -26,14 +26,14 @@ type CodecTestOrder struct {
 }
 
 type CodecTestComplexData struct {
-	Metadata   map[string]any        `json:"metadata"`
-	Tags       []string              `json:"tags"`
-	Nested     *CodecTestNestedData  `json:"nested"`
-	OptionalID *int                  `json:"optional_id,omitempty"`
+	Metadata   map[string]any       `json:"metadata"`
+	Tags       []string             `json:"tags"`
+	Nested     *CodecTestNestedData `json:"nested"`
+	OptionalID *int                 `json:"optional_id,omitempty"`
 }
 
 type CodecTestNestedData struct {
-	Level int                    `json:"level"`
+	Level int            `json:"level"`
 	Items map[string]any `json:"items"`
 }
 
@@ -274,7 +274,7 @@ func TestJSONCodec_EdgeCases(t *testing.T) {
 func TestCodecResolution_PublishOption(t *testing.T) {
 	// Note: This test demonstrates the intended codec resolution behavior
 	// The actual implementation would need to be extended to support custom codecs
-	
+
 	t.Run("custom codec via publish option", func(t *testing.T) {
 		// This would test WithCodec(customCodec) taking precedence
 		t.Skip("Codec resolution not yet implemented - placeholder for future feature")
@@ -299,11 +299,11 @@ func TestCodecResolution_FallbackToJSON(t *testing.T) {
 	t.Run("fallback to JSON when no codec specified", func(t *testing.T) {
 		// Current behavior - always uses JSON
 		codec := JSONCodec
-		
+
 		user := CodecTestUser{ID: 1, Name: "Test", Email: "test@example.com"}
 		data, err := codec.Encode(user)
 		require.NoError(t, err)
-		
+
 		var decoded CodecTestUser
 		err = codec.Decode(data, &decoded)
 		require.NoError(t, err)

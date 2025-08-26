@@ -123,8 +123,8 @@ func (ss *StreamSubscriber) Subscribe(t topic.Topic, sub Subscriber, opts ...Opt
 							if r := recover(); r != nil {
 								// Log the panic but don't crash the worker
 								if ss.log != nil {
-									ss.log.Error("subscriber panic recovered", 
-										"panic", r, 
+									ss.log.Error("subscriber panic recovered",
+										"panic", r,
 										"topic", m.Topic)
 								}
 							}
