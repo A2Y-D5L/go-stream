@@ -116,7 +116,7 @@ type PublisherLogger struct {
 func NewPublisherLogger(streamLogger *StreamLogger, publisherID string) *PublisherLogger {
 	return &PublisherLogger{
 		StreamLogger: &StreamLogger{
-			Logger:   streamLogger.Logger.With(slog.String("publisher_id", publisherID)),
+			Logger:   streamLogger.With(slog.String("publisher_id", publisherID)),
 			streamID: streamLogger.streamID,
 		},
 		publisherID: publisherID,
@@ -133,7 +133,7 @@ type SubscriberLogger struct {
 func NewSubscriberLogger(streamLogger *StreamLogger, subscriberID string) *SubscriberLogger {
 	return &SubscriberLogger{
 		StreamLogger: &StreamLogger{
-			Logger:   streamLogger.Logger.With(slog.String("subscriber_id", subscriberID)),
+			Logger:   streamLogger.With(slog.String("subscriber_id", subscriberID)),
 			streamID: streamLogger.streamID,
 		},
 		subscriberID: subscriberID,
