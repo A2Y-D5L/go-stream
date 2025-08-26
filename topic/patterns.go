@@ -77,7 +77,7 @@ func convertToRegex(pattern string) string {
 
 	// Replace escaped wildcards with regex equivalents
 	escaped = strings.ReplaceAll(escaped, "\\*", "[^.]+")
-	escaped = strings.ReplaceAll(escaped, "\\>", ".*")
+	escaped = strings.ReplaceAll(escaped, ">", ".*")
 
 	// Anchor the pattern
 	return "^" + escaped + "$"

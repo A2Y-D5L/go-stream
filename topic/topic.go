@@ -84,8 +84,16 @@ func Validate(t Topic) error {
 		}
 	}
 
-	// Additional NATS subject validation could be added here
-	// For now, we just check for basic invalid characters
+	// Check for NATS subject validation rules
+	// No leading or trailing dots
+	if strings.HasPrefix(topicStr, ".") || strings.HasSuffix(topicStr, ".") {
+		return ErrInvalidName
+	}
+
+	// No double dots
+	if strings.Contains(topicStr, "..") {
+		return ErrInvalidName
+	}
 
 	return nil
 }

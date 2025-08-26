@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/a2y-d5l/go-stream"
+	"github.com/a2y-d5l/go-stream/sub"
 	"github.com/a2y-d5l/go-stream/test/helpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -269,23 +271,24 @@ func TestPerformance_ScalingCharacteristics(t *testing.T) {
 		messageCount int
 		subscribers  int
 	}{
-		{"Light Load", 1000, 1},
-		{"Medium Load", 5000, 3},
-		{"Heavy Load", 10000, 5},
+		{"load.light", 1000, 1},
+		{"load.medium", 5000, 3},
+		{"load.heavy", 10000, 5},
 	} {
 		t.Run(scale.name, func(t *testing.T) {
-			topic := stream.Topic(fmt.Sprintf("performance.scaling.%s", scale.name))
+			topic := stream.Topic("performance.scaling." + scale.name)
 			receivedCount := int64(0)
 
 			// Create multiple subscribers
 			var subs []stream.Subscription
-			for range scale.subscribers {
+			for i := range scale.subscribers {
 				subscriber := stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 					atomic.AddInt64(&receivedCount, 1)
 					return nil
 				})
 
-				sub, err := s.Subscribe(topic, subscriber)
+				// Use different queue groups so each subscriber gets all messages
+				sub, err := s.Subscribe(topic, subscriber, sub.WithQueueGroupName(fmt.Sprintf("scaling-%s-%d", strings.ReplaceAll(strings.ToLower(scale.name), " ", "_"), i)))
 				require.NoError(t, err)
 				subs = append(subs, sub)
 			}

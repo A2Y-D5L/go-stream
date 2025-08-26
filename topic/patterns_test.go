@@ -147,7 +147,7 @@ func TestFilterTopics(t *testing.T) {
 		"queries.user.get",
 	}
 
-	pattern, err := NewPattern("events.*")
+	pattern, err := NewPattern("events.>")
 	if err != nil {
 		t.Fatalf("Failed to create pattern: %v", err)
 	}
