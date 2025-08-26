@@ -16,6 +16,7 @@ type Topic = topic.Topic
 
 // Constructor
 var New = client.New
+var NewTopic = topic.New
 
 // Subscriber types
 type Subscriber = sub.Subscriber
@@ -26,6 +27,6 @@ type Subscription = sub.Subscription
 type Publisher = pub.Publisher
 
 // Option types
-type Option = client.Option
+type StreamOption = client.Option
 type PublishOption = pub.Option
 type SubscribeOption = sub.Option

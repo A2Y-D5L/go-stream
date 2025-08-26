@@ -27,7 +27,7 @@ type config struct {
 	ReconnectWaitMin   time.Duration
 
 	// Defaults & behavior
-	DefaultTopicMode  topic.TopicMode
+	DefaultTopicMode  topic.Mode
 	DefaultCodec      message.Codec
 	RequestIDHeader   string
 	DrainTimeout      time.Duration
@@ -57,7 +57,7 @@ func defaultConfig() config {
 		ConnectFlushTimeout: 2 * time.Second,
 		ReconnectWaitMin:    250 * time.Millisecond,
 
-		DefaultTopicMode: topic.TopicModeCore,
+		DefaultTopicMode: topic.ModeCore,
 		DefaultCodec:     message.JSONCodec,
 		RequestIDHeader:  "X-Request-Id",
 	}

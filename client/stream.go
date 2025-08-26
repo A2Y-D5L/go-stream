@@ -124,7 +124,7 @@ func New(ctx context.Context, opts ...Option) (*Stream, error) {
 	s := &Stream{cfg: cfg, log: cfg.log, srv: srv, nc: nc}
 	s.started.Store(true)
 
-	if cfg.DefaultTopicMode == topic.TopicModeJetStream {
+	if cfg.DefaultTopicMode == topic.ModeJetStream {
 		if js, jerr := nc.JetStream(); jerr == nil {
 			s.js = js
 		} else {

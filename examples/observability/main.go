@@ -10,7 +10,9 @@ import (
 	"time"
 
 	"github.com/a2y-d5l/go-stream"
+	"github.com/a2y-d5l/go-stream/client"
 	"github.com/a2y-d5l/go-stream/observability"
+	"github.com/a2y-d5l/go-stream/sub"
 )
 
 // This example demonstrates the observability package being used in the context it was designed for:
@@ -70,9 +72,9 @@ func createObservabilityEnabledStream(ctx context.Context, baseLogger observabil
 	
 	// Create stream with observability integration
 	s, err := stream.New(ctx, 
-		stream.WithLogger(slogLogger),
-		stream.WithHost("127.0.0.1"),
-		stream.WithPort(0), // dynamic port
+		client.WithLogger(slogLogger),
+		client.WithHost("127.0.0.1"),
+		client.WithPort(0), // dynamic port
 	)
 	
 	if err != nil {
@@ -106,7 +108,7 @@ func setupOrderProcessingPipeline(ctx context.Context, s *stream.Stream, streamL
 		stream: s,
 	}
 	
-	_, err := s.Subscribe("orders.created", orderProcessor, stream.WithQueueGroupName("order-processors"))
+	_, err := s.Subscribe("orders.created", orderProcessor, sub.WithQueueGroupName("order-processors"))
 	streamLogger.LogSubscribe(ctx, "orders.created", "order-processors", err)
 	
 	// Payment Processing Subscriber  
@@ -114,8 +116,8 @@ func setupOrderProcessingPipeline(ctx context.Context, s *stream.Stream, streamL
 		logger: observability.NewSubscriberLogger(streamLogger, "payment-processor"),
 		stream: s,
 	}
-	
-	_, err = s.Subscribe("payments.process", paymentProcessor, stream.WithQueueGroupName("payment-processors"))
+
+	_, err = s.Subscribe("payments.process", paymentProcessor, sub.WithQueueGroupName("payment-processors"))
 	streamLogger.LogSubscribe(ctx, "payments.process", "payment-processors", err)
 	
 	// Notification Subscriber

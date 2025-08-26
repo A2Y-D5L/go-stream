@@ -655,7 +655,7 @@ func TestServer_Integration(t *testing.T) {
 		case msg := <-received:
 			assert.Equal(t, "hello world", msg)
 		case <-time.After(2 * time.Second):
-			t.Fatal("Message not received within timeout")
+			t.Fatal("message.Message not received within timeout")
 		}
 	})
 	

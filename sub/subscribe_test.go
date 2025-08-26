@@ -1,4 +1,4 @@
-package sub
+package sub_test
 
 import (
 	"context"
@@ -8,27 +8,40 @@ import (
 	"testing"
 	"time"
 
+	"github.com/a2y-d5l/go-stream/client"
+	"github.com/a2y-d5l/go-stream/message"
+	"github.com/a2y-d5l/go-stream/sub"
+	"github.com/a2y-d5l/go-stream/test/helpers"
+	"github.com/a2y-d5l/go-stream/topic"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// Test data structures
+type TestUser struct {
+	ID       int    `json:"id"`
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	IsActive bool   `json:"is_active"`
+}
 
 // ============================================================================
 // Test Helper Functions and Types
 // ============================================================================
 
 // WithQueueGroup is an alias for the existing WithQueueGroupName for consistency
-func WithQueueGroup(name string) SubscribeOption {
-	return WithQueueGroupName(name)
+func WithQueueGroup(name string) sub.Option {
+	return sub.WithQueueGroupName(name)
 }
 
 // Test subscriber implementations
 type CountingSubscriber struct {
 	count int64
 	mu    sync.Mutex
-	calls []Message
+	calls []message.Message
 }
 
-func (c *CountingSubscriber) Handle(ctx context.Context, msg Message) error {
+func (c *CountingSubscriber) Handle(ctx context.Context, msg message.Message) error {
 	atomic.AddInt64(&c.count, 1)
 	c.mu.Lock()
 	c.calls = append(c.calls, msg)
@@ -40,10 +53,10 @@ func (c *CountingSubscriber) Count() int64 {
 	return atomic.LoadInt64(&c.count)
 }
 
-func (c *CountingSubscriber) Messages() []Message {
+func (c *CountingSubscriber) Messages() []message.Message {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	result := make([]Message, len(c.calls))
+	result := make([]message.Message, len(c.calls))
 	copy(result, c.calls)
 	return result
 }
@@ -53,7 +66,7 @@ type FailingSubscriber struct {
 	count     int64
 }
 
-func (f *FailingSubscriber) Handle(ctx context.Context, msg Message) error {
+func (f *FailingSubscriber) Handle(ctx context.Context, msg message.Message) error {
 	count := atomic.AddInt64(&f.count, 1)
 	if int(count) > f.failAfter {
 		return fmt.Errorf("subscriber failed after %d messages", f.failAfter)
@@ -61,36 +74,19 @@ func (f *FailingSubscriber) Handle(ctx context.Context, msg Message) error {
 	return nil
 }
 
-type SlowSubscriber struct {
-	delay time.Duration
-	count int64
-}
-
-func (s *SlowSubscriber) Handle(ctx context.Context, msg Message) error {
-	atomic.AddInt64(&s.count, 1)
-	time.Sleep(s.delay)
-	return nil
-}
-
-func (s *SlowSubscriber) Count() int64 {
-	return atomic.LoadInt64(&s.count)
-}
-
 // ============================================================================
 // Basic Subscription Tests
 // ============================================================================
 
 func TestSubscribe_SimpleHandler(t *testing.T) {
-	s := CreateTestStream(t)
-	topic := Topic("test.subscribe.simple")
+	s := helpers.CreateTestStream(t)
+	topic := topic.Topic("test.subscribe.simple")
 
-	received := make(chan Message, 1)
-	subscriber := SubscriberFunc(func(ctx context.Context, msg Message) error {
+	received := make(chan message.Message, 1)
+	sub, err := s.Subscribe(topic, sub.SubscriberFunc(func(ctx context.Context, msg message.Message) error {
 		received <- msg
 		return nil
-	})
-
-	sub, err := s.Subscribe(topic, subscriber)
+	}))
 	require.NoError(t, err)
 	defer sub.Stop()
 
@@ -98,7 +94,7 @@ func TestSubscribe_SimpleHandler(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Publish a message
-	msg := Message{
+	msg := message.Message{
 		Topic: topic,
 		Data:  []byte("Hello, Subscriber!"),
 		Headers: map[string]string{
@@ -107,7 +103,7 @@ func TestSubscribe_SimpleHandler(t *testing.T) {
 		Time: time.Now(),
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
 	err = s.Publish(ctx, topic, msg)
@@ -124,30 +120,27 @@ func TestSubscribe_SimpleHandler(t *testing.T) {
 }
 
 func TestSubscribe_FailingHandler(t *testing.T) {
-	s := CreateTestStream(t)
-	topic := Topic("test.subscribe.failing")
-
+	s := helpers.CreateTestStream(t)
+	top := topic.Topic("test.subscribe.failing")
 	failingSubscriber := &FailingSubscriber{failAfter: 2}
 
-	sub, err := s.Subscribe(topic, failingSubscriber)
+	sub, err := s.Subscribe(top, failingSubscriber)
 	require.NoError(t, err)
 	defer sub.Stop()
 
 	// Wait for subscription to be ready
 	time.Sleep(100 * time.Millisecond)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
 	// Publish multiple messages
-	for i := 0; i < 5; i++ {
-		msg := Message{
-			Topic: topic,
+	for i := range 5 {
+		require.NoError(t, s.Publish(ctx, top, message.Message{
+			Topic: top,
 			Data:  []byte(fmt.Sprintf("message %d", i)),
 			Time:  time.Now(),
-		}
-		err = s.Publish(ctx, topic, msg)
-		require.NoError(t, err)
+		}))
 	}
 
 	// Allow time for processing
@@ -158,15 +151,13 @@ func TestSubscribe_FailingHandler(t *testing.T) {
 }
 
 func TestSubscribe_NonExistentTopic(t *testing.T) {
-	s := CreateTestStream(t)
-	topic := Topic("test.subscribe.nonexistent.very.specific.topic")
-
-	subscriber := SubscriberFunc(func(ctx context.Context, msg Message) error {
-		return nil
-	})
-
 	// Subscribing to non-existent topic should succeed
-	sub, err := s.Subscribe(topic, subscriber)
+	sub, err := helpers.CreateTestStream(t).
+		Subscribe(topic.Topic("test.subscribe.nonexistent.very.specific.topic"),
+			sub.SubscriberFunc(func(ctx context.Context, msg message.Message) error {
+				return nil
+			}))
+
 	assert.NoError(t, err, "Subscribing to non-existent topic should succeed")
 	if sub != nil {
 		defer sub.Stop()
@@ -174,22 +165,18 @@ func TestSubscribe_NonExistentTopic(t *testing.T) {
 }
 
 func TestSubscribe_ClosedStream(t *testing.T) {
-	s := CreateTestStream(t)
-	topic := Topic("test.subscribe.closed")
-
-	// Close the stream first
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
-	err := s.Close(ctx)
-	require.NoError(t, err)
-
+	s := helpers.CreateTestStream(t)
+	// Close the stream first
+	require.NoError(t, s.Close(ctx))
+	topic := topic.Topic("test.subscribe.closed")
 	// Now try to subscribe
-	subscriber := SubscriberFunc(func(ctx context.Context, msg Message) error {
+	_, err := s.Subscribe(topic, sub.SubscriberFunc(func(ctx context.Context, msg message.Message) error {
 		return nil
-	})
+	}))
 
-	_, err = s.Subscribe(topic, subscriber)
 	assert.Error(t, err, "Subscribing to closed stream should fail")
 }
 
@@ -198,8 +185,8 @@ func TestSubscribe_ClosedStream(t *testing.T) {
 // ============================================================================
 
 func TestSubscribeJSON_ValidData(t *testing.T) {
-	s := CreateTestStream(t)
-	topic := Topic("test.subscribe.json.valid")
+	s := helpers.CreateTestStream(t)
+	top := topic.Topic("test.subscribe.json.valid")
 
 	received := make(chan TestUser, 1)
 	handler := func(ctx context.Context, user TestUser) error {
@@ -207,7 +194,7 @@ func TestSubscribeJSON_ValidData(t *testing.T) {
 		return nil
 	}
 
-	sub, err := SubscribeJSON(s, topic, handler)
+	sub, err := client.SubscribeJSON(s, top, handler)
 	require.NoError(t, err)
 	defer sub.Stop()
 
@@ -222,10 +209,10 @@ func TestSubscribeJSON_ValidData(t *testing.T) {
 		IsActive: true,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
-	err = s.PublishJSON(ctx, topic, user)
+	err = s.PublishJSON(ctx, top, user)
 	require.NoError(t, err)
 
 	// Verify JSON was properly decoded
@@ -241,8 +228,8 @@ func TestSubscribeJSON_ValidData(t *testing.T) {
 }
 
 func TestSubscribeJSON_InvalidJSON(t *testing.T) {
-	s := CreateTestStream(t)
-	topic := Topic("test.subscribe.json.invalid")
+	s := helpers.CreateTestStream(t)
+	top := topic.Topic("test.subscribe.json.invalid")
 
 	errorCount := int64(0)
 	handler := func(ctx context.Context, user TestUser) error {
@@ -251,7 +238,7 @@ func TestSubscribeJSON_InvalidJSON(t *testing.T) {
 		return nil
 	}
 
-	sub, err := SubscribeJSON(s, topic, handler)
+	sub, err := client.SubscribeJSON(s, top, handler)
 	require.NoError(t, err)
 	defer sub.Stop()
 
@@ -259,16 +246,16 @@ func TestSubscribeJSON_InvalidJSON(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Publish invalid JSON
-	invalidMsg := Message{
-		Topic: topic,
+	invalidMsg := message.Message{
+		Topic: top,
 		Data:  []byte("invalid json {"),
 		Time:  time.Now(),
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
-	err = s.Publish(ctx, topic, invalidMsg)
+	err = s.Publish(ctx, top, invalidMsg)
 	require.NoError(t, err)
 
 	// Allow time for processing (and potential error)
@@ -279,8 +266,8 @@ func TestSubscribeJSON_InvalidJSON(t *testing.T) {
 }
 
 func TestSubscribeJSON_TypeMismatch(t *testing.T) {
-	s := CreateTestStream(t)
-	topic := Topic("test.subscribe.json.mismatch")
+	s := helpers.CreateTestStream(t)
+	top := topic.Topic("test.subscribe.json.mismatch")
 
 	handler := func(ctx context.Context, user TestUser) error {
 		// This should not be called for type mismatch
@@ -288,7 +275,7 @@ func TestSubscribeJSON_TypeMismatch(t *testing.T) {
 		return nil
 	}
 
-	sub, err := SubscribeJSON(s, topic, handler)
+	sub, err := client.SubscribeJSON(s, top, handler)
 	require.NoError(t, err)
 	defer sub.Stop()
 
@@ -298,13 +285,13 @@ func TestSubscribeJSON_TypeMismatch(t *testing.T) {
 	// Publish JSON that doesn't match TestUser structure
 	wrongType := map[string]any{
 		"wrong_field": "wrong_value",
-		"id":         "string_instead_of_int", // Type mismatch
+		"id":          "string_instead_of_int", // Type mismatch
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
-	err = s.PublishJSON(ctx, topic, wrongType)
+	err = s.PublishJSON(ctx, top, wrongType)
 	require.NoError(t, err)
 
 	// Allow time for processing
@@ -313,15 +300,15 @@ func TestSubscribeJSON_TypeMismatch(t *testing.T) {
 }
 
 func TestSubscribeJSON_EmptyMessage(t *testing.T) {
-	s := CreateTestStream(t)
-	topic := Topic("test.subscribe.json.empty")
+	s := helpers.CreateTestStream(t)
+	top := topic.Topic("test.subscribe.json.empty")
 
 	handler := func(ctx context.Context, user TestUser) error {
 		t.Error("Handler should not be called for empty message")
 		return nil
 	}
 
-	sub, err := SubscribeJSON(s, topic, handler)
+	sub, err := client.SubscribeJSON(s, top, handler)
 	require.NoError(t, err)
 	defer sub.Stop()
 
@@ -329,16 +316,16 @@ func TestSubscribeJSON_EmptyMessage(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Publish empty message
-	emptyMsg := Message{
-		Topic: topic,
+	emptyMsg := message.Message{
+		Topic: top,
 		Data:  []byte{},
 		Time:  time.Now(),
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
-	err = s.Publish(ctx, topic, emptyMsg)
+	err = s.Publish(ctx, top, emptyMsg)
 	require.NoError(t, err)
 
 	// Allow time for processing
@@ -351,36 +338,36 @@ func TestSubscribeJSON_EmptyMessage(t *testing.T) {
 // ============================================================================
 
 func TestSubscribe_AutoGeneratedQueueGroup(t *testing.T) {
-	s := CreateTestStream(t)
-	topic := Topic("test.subscribe.queue.auto")
+	s := helpers.CreateTestStream(t)
+	top := topic.Topic("test.subscribe.queue.auto")
 
 	subscriber1 := &CountingSubscriber{}
 	subscriber2 := &CountingSubscriber{}
 
 	// Both subscribers without explicit queue group (should auto-generate)
-	sub1, err := s.Subscribe(topic, subscriber1)
+	sub1, err := s.Subscribe(top, subscriber1)
 	require.NoError(t, err)
 	defer sub1.Stop()
 
-	sub2, err := s.Subscribe(topic, subscriber2)
+	sub2, err := s.Subscribe(top, subscriber2)
 	require.NoError(t, err)
 	defer sub2.Stop()
 
 	// Wait for subscriptions to be ready
 	time.Sleep(100 * time.Millisecond)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
 	// Publish multiple messages
 	numMessages := 10
 	for i := 0; i < numMessages; i++ {
-		msg := Message{
-			Topic: topic,
+		msg := message.Message{
+			Topic: top,
 			Data:  []byte(fmt.Sprintf("message %d", i)),
 			Time:  time.Now(),
 		}
-		err = s.Publish(ctx, topic, msg)
+		err = s.Publish(ctx, top, msg)
 		require.NoError(t, err)
 	}
 
@@ -390,15 +377,15 @@ func TestSubscribe_AutoGeneratedQueueGroup(t *testing.T) {
 	// Each subscriber should receive some messages (load balancing)
 	total := subscriber1.Count() + subscriber2.Count()
 	assert.Equal(t, int64(numMessages), total, "Total messages should equal published messages")
-	
+
 	// Both should have received at least one message (in most cases)
 	// Note: This is probabilistic and might occasionally fail in extremely loaded systems
 	assert.Greater(t, subscriber1.Count()+subscriber2.Count(), int64(0))
 }
 
 func TestSubscribe_CustomQueueGroup(t *testing.T) {
-	s := CreateTestStream(t)
-	topic := Topic("test.subscribe.queue.custom")
+	s := helpers.CreateTestStream(t)
+	top := topic.Topic("test.subscribe.queue.custom")
 
 	subscriber1 := &CountingSubscriber{}
 	subscriber2 := &CountingSubscriber{}
@@ -406,29 +393,29 @@ func TestSubscribe_CustomQueueGroup(t *testing.T) {
 	customQueueGroup := "custom-queue-group"
 
 	// Both subscribers with same custom queue group
-	sub1, err := s.Subscribe(topic, subscriber1, WithQueueGroup(customQueueGroup))
+	sub1, err := s.Subscribe(top, subscriber1, WithQueueGroup(customQueueGroup))
 	require.NoError(t, err)
 	defer sub1.Stop()
 
-	sub2, err := s.Subscribe(topic, subscriber2, WithQueueGroup(customQueueGroup))
+	sub2, err := s.Subscribe(top, subscriber2, WithQueueGroup(customQueueGroup))
 	require.NoError(t, err)
 	defer sub2.Stop()
 
 	// Wait for subscriptions to be ready
 	time.Sleep(100 * time.Millisecond)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
 	// Publish multiple messages
 	numMessages := 10
 	for i := 0; i < numMessages; i++ {
-		msg := Message{
-			Topic: topic,
+		msg := message.Message{
+			Topic: top,
 			Data:  []byte(fmt.Sprintf("message %d", i)),
 			Time:  time.Now(),
 		}
-		err = s.Publish(ctx, topic, msg)
+		err = s.Publish(ctx, top, msg)
 		require.NoError(t, err)
 	}
 
@@ -441,36 +428,36 @@ func TestSubscribe_CustomQueueGroup(t *testing.T) {
 }
 
 func TestSubscribe_DifferentQueueGroups(t *testing.T) {
-	s := CreateTestStream(t)
-	topic := Topic("test.subscribe.queue.different")
+	s := helpers.CreateTestStream(t)
+	top := topic.Topic("test.subscribe.queue.different")
 
 	subscriber1 := &CountingSubscriber{}
 	subscriber2 := &CountingSubscriber{}
 
 	// Subscribers with different queue groups (both should receive all messages)
-	sub1, err := s.Subscribe(topic, subscriber1, WithQueueGroup("group1"))
+	sub1, err := s.Subscribe(top, subscriber1, WithQueueGroup("group1"))
 	require.NoError(t, err)
 	defer sub1.Stop()
 
-	sub2, err := s.Subscribe(topic, subscriber2, WithQueueGroup("group2"))
+	sub2, err := s.Subscribe(top, subscriber2, WithQueueGroup("group2"))
 	require.NoError(t, err)
 	defer sub2.Stop()
 
 	// Wait for subscriptions to be ready
 	time.Sleep(100 * time.Millisecond)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
 	// Publish messages
 	numMessages := 5
 	for i := 0; i < numMessages; i++ {
-		msg := Message{
-			Topic: topic,
+		msg := message.Message{
+			Topic: top,
 			Data:  []byte(fmt.Sprintf("message %d", i)),
 			Time:  time.Now(),
 		}
-		err = s.Publish(ctx, topic, msg)
+		err = s.Publish(ctx, top, msg)
 		require.NoError(t, err)
 	}
 
@@ -487,28 +474,28 @@ func TestSubscribe_DifferentQueueGroups(t *testing.T) {
 // ============================================================================
 
 func TestSubscription_Stop(t *testing.T) {
-	s := CreateTestStream(t)
-	topic := Topic("test.subscription.stop")
+	s := helpers.CreateTestStream(t)
+	top := topic.Topic("test.subscription.stop")
 
 	subscriber := &CountingSubscriber{}
 
-	sub, err := s.Subscribe(topic, subscriber)
+	sub, err := s.Subscribe(top, subscriber)
 	require.NoError(t, err)
 
 	// Wait for subscription to be ready
 	time.Sleep(100 * time.Millisecond)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
 	// Publish some messages
 	for i := 0; i < 3; i++ {
-		msg := Message{
-			Topic: topic,
+		msg := message.Message{
+			Topic: top,
 			Data:  []byte(fmt.Sprintf("message %d", i)),
 			Time:  time.Now(),
 		}
-		err = s.Publish(ctx, topic, msg)
+		err = s.Publish(ctx, top, msg)
 		require.NoError(t, err)
 	}
 
@@ -522,12 +509,12 @@ func TestSubscription_Stop(t *testing.T) {
 
 	// Publish more messages (should not be received)
 	for i := 3; i < 6; i++ {
-		msg := Message{
-			Topic: topic,
+		msg := message.Message{
+			Topic: top,
 			Data:  []byte(fmt.Sprintf("message %d", i)),
 			Time:  time.Now(),
 		}
-		err = s.Publish(ctx, topic, msg)
+		err = s.Publish(ctx, top, msg)
 		require.NoError(t, err)
 	}
 
@@ -540,34 +527,34 @@ func TestSubscription_Stop(t *testing.T) {
 }
 
 func TestSubscription_Drain(t *testing.T) {
-	s := CreateTestStream(t)
-	topic := Topic("test.subscription.drain")
+	s := helpers.CreateTestStream(t)
+	top := topic.Topic("test.subscription.drain")
 
 	subscriber := &CountingSubscriber{}
 
-	sub, err := s.Subscribe(topic, subscriber)
+	sub, err := s.Subscribe(top, subscriber)
 	require.NoError(t, err)
 
 	// Wait for subscription to be ready
 	time.Sleep(100 * time.Millisecond)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
 	// Publish messages quickly
 	numMessages := 10
 	for i := 0; i < numMessages; i++ {
-		msg := Message{
-			Topic: topic,
+		msg := message.Message{
+			Topic: top,
 			Data:  []byte(fmt.Sprintf("message %d", i)),
 			Time:  time.Now(),
 		}
-		err = s.Publish(ctx, topic, msg)
+		err = s.Publish(ctx, top, msg)
 		require.NoError(t, err)
 	}
 
 	// Drain the subscription (should process remaining messages)
-	drainCtx, drainCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	drainCtx, drainCancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer drainCancel()
 
 	err = sub.Drain(drainCtx)
@@ -582,18 +569,18 @@ func TestSubscription_Drain(t *testing.T) {
 // ============================================================================
 
 func TestSubscribe_ConcurrentSubscribers(t *testing.T) {
-	s := CreateTestStream(t)
-	topic := Topic("test.subscribe.concurrent")
+	s := helpers.CreateTestStream(t)
+	top := topic.Topic("test.subscribe.concurrent")
 
 	numSubscribers := 5
 	subscribers := make([]*CountingSubscriber, numSubscribers)
-	subs := make([]Subscription, numSubscribers)
+	subs := make([]sub.Subscription, numSubscribers)
 
 	// Create multiple subscribers with different queue groups
 	for i := 0; i < numSubscribers; i++ {
 		subscribers[i] = &CountingSubscriber{}
 		var err error
-		subs[i], err = s.Subscribe(topic, subscribers[i], 
+		subs[i], err = s.Subscribe(top, subscribers[i],
 			WithQueueGroup(fmt.Sprintf("group-%d", i)))
 		require.NoError(t, err)
 		defer subs[i].Stop()
@@ -602,7 +589,7 @@ func TestSubscribe_ConcurrentSubscribers(t *testing.T) {
 	// Wait for subscriptions to be ready
 	time.Sleep(200 * time.Millisecond)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 
 	// Publish messages concurrently
@@ -613,12 +600,12 @@ func TestSubscribe_ConcurrentSubscribers(t *testing.T) {
 		wg.Add(1)
 		go func(msgID int) {
 			defer wg.Done()
-			msg := Message{
-				Topic: topic,
+			msg := message.Message{
+				Topic: top,
 				Data:  []byte(fmt.Sprintf("concurrent message %d", msgID)),
 				Time:  time.Now(),
 			}
-			err := s.Publish(ctx, topic, msg)
+			err := s.Publish(ctx, top, msg)
 			if err != nil {
 				t.Errorf("Failed to publish message %d: %v", msgID, err)
 			}
@@ -633,37 +620,37 @@ func TestSubscribe_ConcurrentSubscribers(t *testing.T) {
 	// Each subscriber should have received all messages (different queue groups)
 	for i, subscriber := range subscribers {
 		count := subscriber.Count()
-		assert.Equal(t, int64(numMessages), count, 
+		assert.Equal(t, int64(numMessages), count,
 			"Subscriber %d should have received all messages", i)
 	}
 }
 
 func TestSubscribe_HighConcurrency(t *testing.T) {
-	s := CreateTestStream(t)
-	topic := Topic("test.subscribe.high.concurrency")
+	s := helpers.CreateTestStream(t)
+	top := topic.Topic("test.subscribe.high.concurrency")
 
 	subscriber := &CountingSubscriber{}
 
 	// Subscribe with high concurrency
-	sub, err := s.Subscribe(topic, subscriber, WithConcurrency(10))
+	sub, err := s.Subscribe(top, subscriber, sub.WithConcurrency(10))
 	require.NoError(t, err)
 	defer sub.Stop()
 
 	// Wait for subscription to be ready
 	time.Sleep(100 * time.Millisecond)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 
 	// Publish many messages quickly (restored to original challenging load)
 	numMessages := 1000
 	for i := 0; i < numMessages; i++ {
-		msg := Message{
-			Topic: topic,
+		msg := message.Message{
+			Topic: top,
 			Data:  []byte(fmt.Sprintf("high concurrency message %d", i)),
 			Time:  time.Now(),
 		}
-		err = s.Publish(ctx, topic, msg)
+		err = s.Publish(ctx, top, msg)
 		require.NoError(t, err)
 	}
 
@@ -680,40 +667,37 @@ func TestSubscribe_HighConcurrency(t *testing.T) {
 // ============================================================================
 
 func TestSubscribe_HandlerPanic(t *testing.T) {
-	s := CreateTestStream(t)
-	topic := Topic("test.subscribe.panic")
+	s := helpers.CreateTestStream(t)
+	top := topic.Topic("test.subscribe.panic")
 
-	panicSubscriber := SubscriberFunc(func(ctx context.Context, msg Message) error {
+	panicSubscriber := sub.SubscriberFunc(func(ctx context.Context, msg message.Message) error {
 		panic("subscriber panic!")
 	})
 
-	sub, err := s.Subscribe(topic, panicSubscriber)
+	sub, err := s.Subscribe(top, panicSubscriber)
 	require.NoError(t, err)
 	defer sub.Stop()
 
 	// Wait for subscription to be ready
 	time.Sleep(100 * time.Millisecond)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
 	// Publish a message that will cause panic
-	msg := Message{
-		Topic: topic,
+	require.NoError(t, s.Publish(ctx, top, message.Message{
+		Topic: top,
 		Data:  []byte("panic trigger"),
 		Time:  time.Now(),
-	}
-
-	err = s.Publish(ctx, topic, msg)
-	require.NoError(t, err)
+	}))
 
 	// Allow time for processing (and panic recovery)
 	time.Sleep(500 * time.Millisecond)
 
+	countingSubscriber := &CountingSubscriber{}
 	// Test that the subscription is still functional after panic
 	// (implementation should now recover from panics)
-	testTopic := Topic("test.subscribe.after.panic")
-	countingSubscriber := &CountingSubscriber{}
+	testTopic := topic.Topic("test.subscribe.after.panic")
 	sub2, err := s.Subscribe(testTopic, countingSubscriber)
 	require.NoError(t, err)
 	defer sub2.Stop()
@@ -721,19 +705,15 @@ func TestSubscribe_HandlerPanic(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Publish to the new subscription to verify system is still working
-	msg2 := Message{
+	require.NoError(t, s.Publish(ctx, testTopic, message.Message{
 		Topic: testTopic,
 		Data:  []byte("recovery test"),
 		Time:  time.Now(),
-	}
-
-	err = s.Publish(ctx, testTopic, msg2)
-	require.NoError(t, err)
+	}))
 
 	// Allow processing time
 	time.Sleep(500 * time.Millisecond)
 
 	// Verify the counting subscriber received the message
-	assert.Greater(t, int(countingSubscriber.count), 0, 
-		"System should still be functional after panic recovery")
+	assert.Greater(t, int(countingSubscriber.count), 0, "System should still be functional after panic recovery")
 }

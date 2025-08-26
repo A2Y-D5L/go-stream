@@ -12,10 +12,13 @@ import (
 type contextKey string
 
 const (
-	requestIDKey contextKey = "request-id"
-	traceIDKey   contextKey = "trace-id"
-	userIDKey    contextKey = "user-id"
-	tenantIDKey  contextKey = "tenant-id"
+	requestIDKey  contextKey = "request-id"
+	traceIDKey    contextKey = "trace-id"
+	spanIDKey     contextKey = "span-id"
+	parentSpanKey contextKey = "parent-span"
+	userIDKey     contextKey = "user-id"
+	tenantIDKey   contextKey = "tenant-id"
+	rolesKey      contextKey = "roles"
 )
 
 // --------------------- Context Value Tests ---------------------
@@ -84,12 +87,12 @@ func TestContext_TraceContext(t *testing.T) {
 
 		ctx := context.Background()
 		ctx = context.WithValue(ctx, traceIDKey, traceID)
-		ctx = context.WithValue(ctx, "span-id", spanID)
-		ctx = context.WithValue(ctx, "parent-span", parentSpan)
+		ctx = context.WithValue(ctx, spanIDKey, spanID)
+		ctx = context.WithValue(ctx, parentSpanKey, parentSpan)
 
 		assert.Equal(t, traceID, ctx.Value(traceIDKey))
-		assert.Equal(t, spanID, ctx.Value("span-id"))
-		assert.Equal(t, parentSpan, ctx.Value("parent-span"))
+		assert.Equal(t, spanID, ctx.Value(spanIDKey))
+		assert.Equal(t, parentSpan, ctx.Value(parentSpanKey))
 	})
 
 	t.Run("trace context inheritance", func(t *testing.T) {
@@ -100,14 +103,14 @@ func TestContext_TraceContext(t *testing.T) {
 		parentCtx := context.WithValue(context.Background(), traceIDKey, parentTraceID)
 
 		// Child context inherits trace ID, adds span ID
-		childCtx := context.WithValue(parentCtx, "span-id", childSpanID)
+		childCtx := context.WithValue(parentCtx, spanIDKey, childSpanID)
 
 		// Both values should be available in child context
 		assert.Equal(t, parentTraceID, childCtx.Value(traceIDKey))
-		assert.Equal(t, childSpanID, childCtx.Value("span-id"))
+		assert.Equal(t, childSpanID, childCtx.Value(spanIDKey))
 
 		// Parent should not have child's span ID
-		assert.Nil(t, parentCtx.Value("span-id"))
+		assert.Nil(t, parentCtx.Value(spanIDKey))
 	})
 }
 
@@ -120,11 +123,11 @@ func TestContext_UserContext(t *testing.T) {
 		ctx := context.Background()
 		ctx = context.WithValue(ctx, userIDKey, userID)
 		ctx = context.WithValue(ctx, tenantIDKey, tenantID)
-		ctx = context.WithValue(ctx, "roles", roles)
+		ctx = context.WithValue(ctx, rolesKey, roles)
 
 		assert.Equal(t, userID, ctx.Value(userIDKey))
 		assert.Equal(t, tenantID, ctx.Value(tenantIDKey))
-		assert.Equal(t, roles, ctx.Value("roles"))
+		assert.Equal(t, roles, ctx.Value(rolesKey))
 	})
 
 	t.Run("anonymous user context", func(t *testing.T) {
@@ -133,7 +136,7 @@ func TestContext_UserContext(t *testing.T) {
 		// No user information should be present
 		assert.Nil(t, ctx.Value(userIDKey))
 		assert.Nil(t, ctx.Value(tenantIDKey))
-		assert.Nil(t, ctx.Value("roles"))
+		assert.Nil(t, ctx.Value(rolesKey))
 	})
 }
 
@@ -218,7 +221,7 @@ func TestContext_Timeouts(t *testing.T) {
 	})
 }
 
-// --------------------- Context Message Integration Tests ---------------------
+// --------------------- Context message.Message Integration Tests ---------------------
 
 func TestContext_MessageIntegration(t *testing.T) {
 	t.Run("context to headers conversion", func(t *testing.T) {
@@ -282,7 +285,7 @@ func TestContext_BestPractices(t *testing.T) {
 
 	t.Run("context key type safety", func(t *testing.T) {
 		// Using typed keys prevents collisions
-		const stringKey = "request-id"
+		const stringKey contextKey = "string-key"
 
 		ctx := context.Background()
 		ctx = context.WithValue(ctx, requestIDKey, "typed-value")
@@ -328,22 +331,34 @@ func TestContext_BestPractices(t *testing.T) {
 
 // --------------------- Helper Functions ---------------------
 
+type svcAProcessedKeyType struct{}
+
+var svcAProcessedKey = svcAProcessedKeyType{}
+
 // simulateServiceA simulates passing context through service A
 func simulateServiceA(ctx context.Context) context.Context {
 	// Service A might add its own values but preserves existing ones
-	return context.WithValue(ctx, "service-a-processed", time.Now())
+	return context.WithValue(ctx, svcAProcessedKey, time.Now())
 }
+
+type svcBProcessedKeyType struct{}
+
+var svcBProcessedKey = svcBProcessedKeyType{}
 
 // simulateServiceB simulates passing context through service B
 func simulateServiceB(ctx context.Context) context.Context {
 	// Service B might add its own values but preserves existing ones
-	return context.WithValue(ctx, "service-b-processed", time.Now())
+	return context.WithValue(ctx, svcBProcessedKey, time.Now())
 }
+
+type svcCProcessedKeyType struct{}
+
+var svcCProcessedKey = svcCProcessedKeyType{}
 
 // simulateServiceC simulates passing context through service C
 func simulateServiceC(ctx context.Context) context.Context {
 	// Service C might add its own values but preserves existing ones
-	return context.WithValue(ctx, "service-c-processed", time.Now())
+	return context.WithValue(ctx, svcCProcessedKey, time.Now())
 }
 
 // contextToHeaders extracts relevant context values into headers

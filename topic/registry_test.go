@@ -10,7 +10,7 @@ func TestRegistry_Register(t *testing.T) {
 	topic := Topic("test.topic")
 	info := &TopicInfo{
 		Description: "Test topic",
-		Mode:        TopicModeCore,
+		Mode:        ModeCore,
 	}
 
 	err := registry.Register(topic, info)
@@ -20,7 +20,7 @@ func TestRegistry_Register(t *testing.T) {
 
 	// Test duplicate registration
 	err = registry.Register(topic, info)
-	if err != ErrTopicExists {
+	if err != ErrAlreadyExists {
 		t.Fatalf("Expected ErrTopicExists, got: %v", err)
 	}
 }
@@ -31,7 +31,7 @@ func TestRegistry_Get(t *testing.T) {
 	topic := Topic("test.topic")
 	originalInfo := &TopicInfo{
 		Description: "Test topic",
-		Mode:        TopicModeCore,
+		Mode:        ModeCore,
 	}
 
 	err := registry.Register(topic, originalInfo)
@@ -63,7 +63,7 @@ func TestRegistry_Unregister(t *testing.T) {
 	topic := Topic("test.topic")
 	info := &TopicInfo{
 		Description: "Test topic",
-		Mode:        TopicModeCore,
+		Mode:        ModeCore,
 	}
 
 	err := registry.Register(topic, info)
@@ -166,27 +166,27 @@ func TestRegistry_GetByMode(t *testing.T) {
 	jsTopics := []Topic{"js1", "js2"}
 
 	for _, topic := range coreTopics {
-		err := registry.Register(topic, &TopicInfo{Mode: TopicModeCore})
+		err := registry.Register(topic, &TopicInfo{Mode: ModeCore})
 		if err != nil {
 			t.Fatalf("Failed to register core topic %s: %v", topic, err)
 		}
 	}
 
 	for _, topic := range jsTopics {
-		err := registry.Register(topic, &TopicInfo{Mode: TopicModeJetStream})
+		err := registry.Register(topic, &TopicInfo{Mode: ModeJetStream})
 		if err != nil {
 			t.Fatalf("Failed to register JS topic %s: %v", topic, err)
 		}
 	}
 
 	// Test getting core topics
-	coreList := registry.GetByMode(TopicModeCore)
+	coreList := registry.GetByMode(ModeCore)
 	if len(coreList) != len(coreTopics) {
 		t.Errorf("Expected %d core topics, got %d", len(coreTopics), len(coreList))
 	}
 
 	// Test getting JS topics
-	jsList := registry.GetByMode(TopicModeJetStream)
+	jsList := registry.GetByMode(ModeJetStream)
 	if len(jsList) != len(jsTopics) {
 		t.Errorf("Expected %d JS topics, got %d", len(jsTopics), len(jsList))
 	}

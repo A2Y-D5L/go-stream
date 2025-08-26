@@ -2,33 +2,39 @@ package topic
 
 import (
 	"errors"
+	"strings"
 	"time"
+	"unicode"
 )
 
 var (
-	// ErrInvalidTopic indicates the topic name is invalid.
-	ErrInvalidTopic = errors.New("invalid topic name")
-	// ErrTopicExists indicates the topic already exists.
-	ErrTopicExists = errors.New("topic already exists")
-	// ErrUnknownTopic indicates the topic does not exist.
-	ErrUnknownTopic = errors.New("unknown topic")
+	// ErrInvalidName indicates the topic name is invalid.
+	ErrInvalidName = errors.New("invalid topic name")
+	// ErrAlreadyExists indicates the topic already exists.
+	ErrAlreadyExists = errors.New("topic already exists")
+	// ErrUnknown indicates the topic does not exist.
+	ErrUnknown = errors.New("unknown topic")
 )
 
 type Topic string
 
-// TopicMode controls the default topic mode at the Stream level (topics can override).
-type TopicMode int
+func New(name string) Topic {
+	return Topic(Sanitize(name))
+}
+
+// Mode controls the default topic mode at the Stream level (topics can override).
+type Mode int
 
 const (
-	TopicModeCore TopicMode = iota
-	TopicModeJetStream
+	ModeCore Mode = iota
+	ModeJetStream
 )
 
-func (m TopicMode) String() string {
+func (m Mode) String() string {
 	switch m {
-	case TopicModeCore:
+	case ModeCore:
 		return "core"
-	case TopicModeJetStream:
+	case ModeJetStream:
 		return "jetstream"
 	default:
 		return "unknown"
@@ -49,9 +55,9 @@ const (
 	DiscardNew
 )
 
-// TopicOptions holds configuration for individual topics.
-type TopicOptions struct {
-	Mode           TopicMode
+// Options holds configuration for individual topics.
+type Options struct {
+	Mode           Mode
 	Retention      Retention
 	DiscardPolicy  DiscardPolicy
 	MaxAge         time.Duration
@@ -63,18 +69,18 @@ type TopicOptions struct {
 	Duplicates     time.Duration
 }
 
-// ValidateTopic validates a topic name according to NATS subject naming rules
-func ValidateTopic(topic Topic) error {
-	if topic == "" {
-		return ErrInvalidTopic
+// Validate validates a topic name according to NATS subject naming rules
+func Validate(t Topic) error {
+	if t == "" {
+		return ErrInvalidName
 	}
 
-	topicStr := string(topic)
+	topicStr := string(t)
 
 	// Check for invalid characters
 	for _, char := range topicStr {
 		if char == ' ' || char == '\t' || char == '\n' || char == '\r' {
-			return ErrInvalidTopic
+			return ErrInvalidName
 		}
 	}
 
@@ -97,4 +103,36 @@ func (t Topic) IsEmpty() bool {
 // Equals checks if two topics are equal
 func (t Topic) Equals(other Topic) bool {
 	return t == other
+}
+
+func Sanitize(s string) string {
+	// Replace non-alnum with underscores, collapse repeats, lowercase.
+	var b strings.Builder
+	b.Grow(len(s))
+	lastUnderscore := false
+	for _, r := range s {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			b.WriteRune(unicode.ToLower(r))
+			lastUnderscore = false
+			continue
+		}
+		if !lastUnderscore {
+			b.WriteByte('_')
+			lastUnderscore = true
+		}
+	}
+	out := b.String()
+	if strings.HasPrefix(out, "_") {
+		out = strings.TrimLeft(out, "_")
+	}
+	if strings.HasSuffix(out, "_") {
+		out = strings.TrimRight(out, "_")
+	}
+	if out == "" {
+		return "unnamed"
+	}
+	if len(out) > 48 {
+		return out[:48]
+	}
+	return out
 }

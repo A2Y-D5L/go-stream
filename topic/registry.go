@@ -21,7 +21,7 @@ type Registry struct {
 type TopicInfo struct {
 	Topic       Topic     `json:"topic"`
 	Description string    `json:"description"`
-	Mode        TopicMode `json:"mode"`
+	Mode        Mode `json:"mode"`
 	Schema      string    `json:"schema,omitempty"`
 	CreatedAt   int64     `json:"created_at"`
 }
@@ -35,7 +35,7 @@ func NewRegistry() *Registry {
 
 // Register registers a topic with the given information
 func (r *Registry) Register(topic Topic, info *TopicInfo) error {
-	if err := ValidateTopic(topic); err != nil {
+	if err := Validate(topic); err != nil {
 		return err
 	}
 
@@ -43,13 +43,13 @@ func (r *Registry) Register(topic Topic, info *TopicInfo) error {
 	defer r.mu.Unlock()
 
 	if _, exists := r.topics[topic]; exists {
-		return ErrTopicExists
+		return ErrAlreadyExists
 	}
 
 	if info == nil {
 		info = &TopicInfo{
 			Topic:     topic,
-			Mode:      TopicModeCore,
+			Mode:      ModeCore,
 			CreatedAt: currentTimeMillis(),
 		}
 	} else {
@@ -142,7 +142,7 @@ func (r *Registry) Clear() {
 }
 
 // GetByMode returns all topics with the specified mode
-func (r *Registry) GetByMode(mode TopicMode) []*TopicInfo {
+func (r *Registry) GetByMode(mode Mode) []*TopicInfo {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 

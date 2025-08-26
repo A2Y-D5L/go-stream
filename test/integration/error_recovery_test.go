@@ -8,20 +8,24 @@ import (
 	"testing"
 	"time"
 
+	"github.com/a2y-d5l/go-stream"
+	"github.com/a2y-d5l/go-stream/message"
+	"github.com/a2y-d5l/go-stream/sub"
+	"github.com/a2y-d5l/go-stream/test/helpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // TestErrorRecovery tests system recovery after various types of failures
 func TestErrorRecovery(t *testing.T) {
-	s := CreateTestStream(t)
-	topic := Topic("error.recovery.test")
-	
+	s := helpers.CreateTestStream(t)
+	topic := stream.Topic("error.recovery.test")
+
 	// Test recovery from subscriber errors
 	errorCount := int64(0)
 	recoveredCount := int64(0)
-	
-	subscriber := SubscriberFunc(func(ctx context.Context, msg Message) error {
+
+	subscriber := sub.SubscriberFunc(func(ctx context.Context, msg message.Message) error {
 		count := atomic.AddInt64(&errorCount, 1)
 		if count <= 3 {
 			return errors.New("simulated processing error")
@@ -39,7 +43,7 @@ func TestErrorRecovery(t *testing.T) {
 
 	// Publish messages that will initially fail
 	for i := 0; i < 10; i++ {
-		msg := Message{
+		msg := message.Message{
 			Topic: topic,
 			Data:  []byte(fmt.Sprintf("message-%d", i)),
 			Time:  time.Now(),
@@ -52,20 +56,20 @@ func TestErrorRecovery(t *testing.T) {
 	time.Sleep(3 * time.Second)
 
 	// Verify some messages were processed after recovery
-	assert.Greater(t, atomic.LoadInt64(&recoveredCount), int64(0), 
+	assert.Greater(t, atomic.LoadInt64(&recoveredCount), int64(0),
 		"Should have recovered and processed some messages")
 }
 
 // TestPartialFailureHandling tests handling of partial system failures
 func TestPartialFailureHandling(t *testing.T) {
-	s := CreateTestStream(t)
-	topic := Topic("partial.failure.test")
-	
+	s := helpers.CreateTestStream(t)
+	topic := stream.Topic("partial.failure.test")
+
 	successCount := int64(0)
 	failureCount := int64(0)
-	
+
 	// Subscriber that fails on specific messages
-	subscriber := SubscriberFunc(func(ctx context.Context, msg Message) error {
+	subscriber := sub.SubscriberFunc(func(ctx context.Context, msg message.Message) error {
 		msgStr := string(msg.Data)
 		if msgStr == "fail-message" {
 			atomic.AddInt64(&failureCount, 1)
@@ -84,12 +88,12 @@ func TestPartialFailureHandling(t *testing.T) {
 
 	// Publish mix of successful and failing messages
 	messages := []string{
-		"success-1", "fail-message", "success-2", 
+		"success-1", "fail-message", "success-2",
 		"success-3", "fail-message", "success-4",
 	}
 
 	for _, msgData := range messages {
-		msg := Message{
+		msg := message.Message{
 			Topic: topic,
 			Data:  []byte(msgData),
 			Time:  time.Now(),
@@ -102,29 +106,29 @@ func TestPartialFailureHandling(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	// Verify partial success handling
-	assert.Equal(t, int64(4), atomic.LoadInt64(&successCount), 
+	assert.Equal(t, int64(4), atomic.LoadInt64(&successCount),
 		"Should process successful messages")
-	assert.Equal(t, int64(2), atomic.LoadInt64(&failureCount), 
+	assert.Equal(t, int64(2), atomic.LoadInt64(&failureCount),
 		"Should encounter expected failures")
 }
 
 // TestGracefulDegradation tests system behavior under degraded conditions
 func TestGracefulDegradation(t *testing.T) {
-	s := CreateTestStream(t)
-	topic := Topic("degradation.test")
-	
+	s := helpers.CreateTestStream(t)
+	topic := stream.Topic("degradation.test")
+
 	// Simulate gradually degrading subscriber performance
 	processedCount := int64(0)
-	
-	subscriber := SubscriberFunc(func(ctx context.Context, msg Message) error {
+
+	subscriber := sub.SubscriberFunc(func(ctx context.Context, msg message.Message) error {
 		count := atomic.LoadInt64(&processedCount)
-		
+
 		// Simulate increasing processing delay (degradation)
 		delay := time.Duration(count*10) * time.Millisecond
 		if delay > 100*time.Millisecond {
 			delay = 100 * time.Millisecond // Cap the delay
 		}
-		
+
 		time.Sleep(delay)
 		atomic.AddInt64(&processedCount, 1)
 		return nil
@@ -140,14 +144,14 @@ func TestGracefulDegradation(t *testing.T) {
 	// Publish messages at constant rate
 	messageCount := 20
 	for i := 0; i < messageCount; i++ {
-		msg := Message{
+		msg := message.Message{
 			Topic: topic,
 			Data:  []byte(fmt.Sprintf("degraded-message-%d", i)),
 			Time:  time.Now(),
 		}
 		err := s.Publish(ctx, topic, msg)
 		require.NoError(t, err)
-		
+
 		time.Sleep(50 * time.Millisecond) // Constant publish rate
 	}
 
@@ -162,13 +166,13 @@ func TestGracefulDegradation(t *testing.T) {
 
 // TestPanicRecovery tests recovery from panics in subscribers
 func TestPanicRecovery(t *testing.T) {
-	s := CreateTestStream(t)
-	topic := Topic("panic.recovery.test")
-	
+	s := helpers.CreateTestStream(t)
+	topic := stream.Topic("panic.recovery.test")
+
 	processedCount := int64(0)
 	panicCount := int64(0)
-	
-	subscriber := SubscriberFunc(func(ctx context.Context, msg Message) error {
+
+	subscriber := sub.SubscriberFunc(func(ctx context.Context, msg message.Message) error {
 		msgStr := string(msg.Data)
 		if msgStr == "panic-trigger" {
 			atomic.AddInt64(&panicCount, 1)
@@ -192,7 +196,7 @@ func TestPanicRecovery(t *testing.T) {
 	}
 
 	for _, msgData := range messages {
-		msg := Message{
+		msg := message.Message{
 			Topic: topic,
 			Data:  []byte(msgData),
 			Time:  time.Now(),
@@ -205,46 +209,46 @@ func TestPanicRecovery(t *testing.T) {
 	time.Sleep(3 * time.Second)
 
 	// Verify system continued processing after panics
-	assert.Equal(t, int64(4), atomic.LoadInt64(&processedCount), 
+	assert.Equal(t, int64(4), atomic.LoadInt64(&processedCount),
 		"Should process normal messages despite panics")
 	t.Logf("Handled %d panics gracefully", atomic.LoadInt64(&panicCount))
 }
 
 // TestCircuitBreakerPattern tests circuit breaker behavior for failing services
 func TestCircuitBreakerPattern(t *testing.T) {
-	s := CreateTestStream(t)
-	topic := Topic("circuit.breaker.test")
-	
+	s := helpers.CreateTestStream(t)
+	topic := stream.Topic("circuit.breaker.test")
+
 	failureCount := int64(0)
 	successCount := int64(0)
 	circuitOpen := int64(0)
-	
+
 	// Simulate circuit breaker pattern
-	subscriber := SubscriberFunc(func(ctx context.Context, msg Message) error {
+	subscriber := sub.SubscriberFunc(func(ctx context.Context, msg message.Message) error {
 		// Check if circuit should be "open" (too many failures)
 		failures := atomic.LoadInt64(&failureCount)
 		if failures > 3 && failures < 10 {
 			atomic.StoreInt64(&circuitOpen, 1)
 			return errors.New("circuit breaker open - too many failures")
 		}
-		
+
 		// Reset circuit after some time
 		if failures >= 10 {
 			atomic.StoreInt64(&circuitOpen, 0)
 			atomic.StoreInt64(&failureCount, 0) // Reset failure count
 		}
-		
+
 		// Simulate some operations failing
 		msgStr := string(msg.Data)
 		if msgStr == "failing-operation" && atomic.LoadInt64(&circuitOpen) == 0 {
 			atomic.AddInt64(&failureCount, 1)
 			return errors.New("operation failed")
 		}
-		
+
 		if atomic.LoadInt64(&circuitOpen) == 0 {
 			atomic.AddInt64(&successCount, 1)
 		}
-		
+
 		return nil
 	})
 
@@ -263,15 +267,15 @@ func TestCircuitBreakerPattern(t *testing.T) {
 		} else {
 			msgData = fmt.Sprintf("normal-operation-%d", i)
 		}
-		
-		msg := Message{
+
+		msg := message.Message{
 			Topic: topic,
 			Data:  []byte(msgData),
 			Time:  time.Now(),
 		}
 		err := s.Publish(ctx, topic, msg)
 		require.NoError(t, err)
-		
+
 		time.Sleep(100 * time.Millisecond)
 	}
 
@@ -286,22 +290,22 @@ func TestCircuitBreakerPattern(t *testing.T) {
 
 // TestResourceExhaustionRecovery tests recovery from resource exhaustion
 func TestResourceExhaustionRecovery(t *testing.T) {
-	s := CreateTestStream(t)
-	topic := Topic("resource.exhaustion.test")
-	
+	s := helpers.CreateTestStream(t)
+	topic := stream.Topic("resource.exhaustion.test")
+
 	processedCount := int64(0)
 	rejectedCount := int64(0)
-	
+
 	// Simulate resource exhaustion and recovery
-	subscriber := SubscriberFunc(func(ctx context.Context, msg Message) error {
+	subscriber := sub.SubscriberFunc(func(ctx context.Context, msg message.Message) error {
 		count := atomic.LoadInt64(&processedCount)
-		
+
 		// Simulate resource exhaustion after 5 messages
 		if count >= 5 && count < 10 {
 			atomic.AddInt64(&rejectedCount, 1)
 			return errors.New("resource exhausted - rejecting message")
 		}
-		
+
 		// Simulate resource recovery after message 10
 		atomic.AddInt64(&processedCount, 1)
 		time.Sleep(50 * time.Millisecond) // Simulate processing time
@@ -317,7 +321,7 @@ func TestResourceExhaustionRecovery(t *testing.T) {
 
 	// Publish messages to trigger exhaustion and recovery
 	for i := 0; i < 15; i++ {
-		msg := Message{
+		msg := message.Message{
 			Topic: topic,
 			Data:  []byte(fmt.Sprintf("resource-test-%d", i)),
 			Time:  time.Now(),
@@ -332,39 +336,38 @@ func TestResourceExhaustionRecovery(t *testing.T) {
 	// Verify recovery from resource exhaustion
 	processed := atomic.LoadInt64(&processedCount)
 	rejected := atomic.LoadInt64(&rejectedCount)
-	
+
 	assert.Greater(t, processed, int64(0), "Should process messages before and after exhaustion")
 	assert.Greater(t, rejected, int64(0), "Should reject messages during exhaustion")
-	
+
 	t.Logf("Resource exhaustion test: %d processed, %d rejected", processed, rejected)
 }
 
 // TestCascadingFailureContainment tests containment of cascading failures
 func TestCascadingFailureContainment(t *testing.T) {
-	s := CreateTestStream(t)
+	s := helpers.CreateTestStream(t)
 
 	// Multiple topics to simulate different services
-	topics := []Topic{
-		Topic("service.a"),
-		Topic("service.b"), 
-		Topic("service.c"),
+	topics := []stream.Topic{
+		stream.Topic("service.a"),
+		stream.Topic("service.b"),
+		stream.Topic("service.c"),
 	}
-	
+
 	// Track processing per service
 	serviceCounts := make(map[string]*int64)
 	serviceErrors := make(map[string]*int64)
-	
-	var subs []Subscription
-	
+
+	var subs []stream.Subscription
 	for _, topic := range topics {
 		serviceName := string(topic)
 		serviceCounts[serviceName] = new(int64)
 		serviceErrors[serviceName] = new(int64)
-		
+
 		// Create subscriber for each service
-		subscriber := SubscriberFunc(func(ctx context.Context, msg Message) error {
+		subscription, err := s.Subscribe(topic, sub.SubscriberFunc(func(ctx context.Context, msg message.Message) error {
 			serviceName := string(msg.Topic)
-			
+
 			// Service A fails after 3 messages (simulate cascading failure)
 			if serviceName == "service.a" {
 				count := atomic.LoadInt64(serviceCounts[serviceName])
@@ -373,19 +376,17 @@ func TestCascadingFailureContainment(t *testing.T) {
 					return errors.New("service A cascading failure")
 				}
 			}
-			
+
 			atomic.AddInt64(serviceCounts[serviceName], 1)
 			return nil
-		})
-		
-		sub, err := s.Subscribe(topic, subscriber)
+		}))
 		require.NoError(t, err)
-		subs = append(subs, sub)
+		subs = append(subs, subscription)
 	}
-	
+
 	defer func() {
-		for _, sub := range subs {
-			sub.Stop()
+		for _, s := range subs {
+			s.Stop()
 		}
 	}()
 
@@ -393,9 +394,9 @@ func TestCascadingFailureContainment(t *testing.T) {
 	defer cancel()
 
 	// Publish to all services
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		for _, topic := range topics {
-			msg := Message{
+			msg := message.Message{
 				Topic: topic,
 				Data:  []byte(fmt.Sprintf("message-%d", i)),
 				Time:  time.Now(),
@@ -409,13 +410,13 @@ func TestCascadingFailureContainment(t *testing.T) {
 	time.Sleep(3 * time.Second)
 
 	// Verify that failure in service A didn't affect other services
-	assert.Equal(t, int64(3), atomic.LoadInt64(serviceCounts["service.a"]), 
+	assert.Equal(t, int64(3), atomic.LoadInt64(serviceCounts["service.a"]),
 		"Service A should process 3 messages before failing")
-	assert.Equal(t, int64(10), atomic.LoadInt64(serviceCounts["service.b"]), 
+	assert.Equal(t, int64(10), atomic.LoadInt64(serviceCounts["service.b"]),
 		"Service B should process all messages despite A's failure")
-	assert.Equal(t, int64(10), atomic.LoadInt64(serviceCounts["service.c"]), 
+	assert.Equal(t, int64(10), atomic.LoadInt64(serviceCounts["service.c"]),
 		"Service C should process all messages despite A's failure")
-	
-	assert.Greater(t, atomic.LoadInt64(serviceErrors["service.a"]), int64(0), 
+
+	assert.Greater(t, atomic.LoadInt64(serviceErrors["service.a"]), int64(0),
 		"Service A should have errors")
 }

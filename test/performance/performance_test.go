@@ -9,15 +9,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/a2y-d5l/go-stream"
+	"github.com/a2y-d5l/go-stream/test/helpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/a2y-d5l/go-stream"
 )
 
 // TestPerformance_EndToEndThroughput tests end-to-end message throughput
 func TestPerformance_EndToEndThroughput(t *testing.T) {
-	s := stream.CreateTestStream(t)
+	s := helpers.CreateTestStream(t)
 	topic := stream.Topic("performance.throughput.test")
 
 	// Capture performance metrics
@@ -27,7 +27,7 @@ func TestPerformance_EndToEndThroughput(t *testing.T) {
 	
 	received := make(chan struct{}, int(messageCount))
 	
-	subscriber := SubscriberFunc(func(ctx context.Context, msg Message) error {
+	subscriber := stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		count := atomic.AddInt64(&receivedCount, 1)
 		if count == 1 {
 			receiveStart = time.Now()
@@ -52,11 +52,11 @@ func TestPerformance_EndToEndThroughput(t *testing.T) {
 	// Measure publish performance
 	publishStart = time.Now()
 	for i := int64(0); i < messageCount; i++ {
-		msg := Message{
+		msg := stream.Message{
 			Topic: topic,
 			Data:  []byte(fmt.Sprintf("performance-message-%d", i)),
 			Headers: map[string]string{
-				"Message-ID": fmt.Sprintf("perf-%d", i),
+				"stream.Message-ID": fmt.Sprintf("perf-%d", i),
 			},
 			Time: time.Now(),
 		}
@@ -69,7 +69,7 @@ func TestPerformance_EndToEndThroughput(t *testing.T) {
 	for i := int64(0); i < messageCount; i++ {
 		select {
 		case <-received:
-			// Message received
+			// stream.Message received
 		case <-time.After(30 * time.Second):
 			t.Fatalf("Timeout waiting for message %d", i+1)
 		}
@@ -96,8 +96,8 @@ func TestPerformance_EndToEndThroughput(t *testing.T) {
 
 // TestPerformance_MemoryUsage tests memory usage patterns under load
 func TestPerformance_MemoryUsage(t *testing.T) {
-	s := CreateTestStream(t)
-	topic := Topic("performance.memory.test")
+	s := helpers.CreateTestStream(t)
+	top := stream.Topic("performance.memory.test")
 
 	// Baseline memory measurement
 	runtime.GC()
@@ -106,12 +106,12 @@ func TestPerformance_MemoryUsage(t *testing.T) {
 
 	processedCount := int64(0)
 	
-	subscriber := SubscriberFunc(func(ctx context.Context, msg Message) error {
+	subscriber := stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		atomic.AddInt64(&processedCount, 1)
 		return nil
 	})
 
-	sub, err := s.Subscribe(topic, subscriber)
+	sub, err := s.Subscribe(top, subscriber)
 	require.NoError(t, err)
 	defer sub.Stop()
 
@@ -121,17 +121,17 @@ func TestPerformance_MemoryUsage(t *testing.T) {
 	// Publish messages and measure memory usage
 	messageCount := 50000
 	for i := 0; i < messageCount; i++ {
-		msg := Message{
-			Topic: topic,
+		msg := stream.Message{
+			Topic: top,
 			Data:  []byte(fmt.Sprintf("memory-test-message-%d-with-some-content-to-make-it-larger", i)),
 			Headers: map[string]string{
 				"Content-Type": "text/plain",
-				"Message-ID":   fmt.Sprintf("mem-%d", i),
+				"stream.Message-ID":   fmt.Sprintf("mem-%d", i),
 				"Extra-Header": fmt.Sprintf("extra-data-%d", i),
 			},
 			Time: time.Now(),
 		}
-		err := s.Publish(ctx, topic, msg)
+		err := s.Publish(ctx, top, msg)
 		require.NoError(t, err)
 		
 		// Measure memory periodically
@@ -170,13 +170,13 @@ func TestPerformance_MemoryUsage(t *testing.T) {
 
 // TestPerformance_Latency tests message latency patterns
 func TestPerformance_Latency(t *testing.T) {
-	s := CreateTestStream(t)
-	topic := Topic("performance.latency.test")
+	s := helpers.CreateTestStream(t)
+	topic := stream.Topic("performance.latency.test")
 
 	var latencies []time.Duration
 	var latencyMutex sync.Mutex
 	
-	subscriber := SubscriberFunc(func(ctx context.Context, msg Message) error {
+	subscriber := stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		receiveTime := time.Now()
 		
 		// Extract send time from message headers
@@ -202,12 +202,12 @@ func TestPerformance_Latency(t *testing.T) {
 	messageCount := 1000
 	for i := 0; i < messageCount; i++ {
 		sendTime := time.Now()
-		msg := Message{
+		msg := stream.Message{
 			Topic: topic,
 			Data:  []byte(fmt.Sprintf("latency-test-%d", i)),
 			Headers: map[string]string{
 				"Send-Time":  sendTime.Format(time.RFC3339Nano),
-				"Message-ID": fmt.Sprintf("lat-%d", i),
+				"stream.Message-ID": fmt.Sprintf("lat-%d", i),
 			},
 			Time: sendTime,
 		}
@@ -263,7 +263,7 @@ func TestPerformance_Latency(t *testing.T) {
 
 // TestPerformance_ScalingCharacteristics tests how performance scales with load
 func TestPerformance_ScalingCharacteristics(t *testing.T) {
-	s := CreateTestStream(t)
+	s := helpers.CreateTestStream(t)
 	
 	testScales := []struct {
 		name         string
@@ -277,13 +277,13 @@ func TestPerformance_ScalingCharacteristics(t *testing.T) {
 
 	for _, scale := range testScales {
 		t.Run(scale.name, func(t *testing.T) {
-			topic := Topic(fmt.Sprintf("performance.scaling.%s", scale.name))
+			topic := stream.Topic(fmt.Sprintf("performance.scaling.%s", scale.name))
 			receivedCount := int64(0)
 			
 			// Create multiple subscribers
-			var subs []Subscription
+			var subs []stream.Subscription
 			for i := 0; i < scale.subscribers; i++ {
-				subscriber := SubscriberFunc(func(ctx context.Context, msg Message) error {
+				subscriber := stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 					atomic.AddInt64(&receivedCount, 1)
 					return nil
 				})
@@ -306,7 +306,7 @@ func TestPerformance_ScalingCharacteristics(t *testing.T) {
 			startTime := time.Now()
 			
 			for i := 0; i < scale.messageCount; i++ {
-				msg := Message{
+				msg := stream.Message{
 					Topic: topic,
 					Data:  []byte(fmt.Sprintf("scaling-test-%d", i)),
 					Time:  time.Now(),
@@ -340,20 +340,20 @@ func TestPerformance_ScalingCharacteristics(t *testing.T) {
 
 // TestPerformance_ConcurrentOperations tests performance under concurrent operations
 func TestPerformance_ConcurrentOperations(t *testing.T) {
-	s := CreateTestStream(t)
+	s := helpers.CreateTestStream(t)
 	
-	topics := []Topic{
-		Topic("performance.concurrent.topic1"),
-		Topic("performance.concurrent.topic2"),
-		Topic("performance.concurrent.topic3"),
+	topics := []stream.Topic{
+		stream.Topic("performance.concurrent.topic1"),
+		stream.Topic("performance.concurrent.topic2"),
+		stream.Topic("performance.concurrent.topic3"),
 	}
 	
 	totalReceived := int64(0)
-	var subs []Subscription
-	
+	var subs []stream.Subscription
+
 	// Create subscribers for all topics
 	for _, topic := range topics {
-		subscriber := SubscriberFunc(func(ctx context.Context, msg Message) error {
+		subscriber := stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 			atomic.AddInt64(&totalReceived, 1)
 			// Simulate some processing time
 			time.Sleep(time.Microsecond * 100)
@@ -381,10 +381,10 @@ func TestPerformance_ConcurrentOperations(t *testing.T) {
 	var wg sync.WaitGroup
 	for _, topic := range topics {
 		wg.Add(1)
-		go func(t Topic) {
+		go func(t stream.Topic) {
 			defer wg.Done()
 			for i := 0; i < messagesPerTopic; i++ {
-				msg := Message{
+				msg := stream.Message{
 					Topic: t,
 					Data:  []byte(fmt.Sprintf("concurrent-msg-%d", i)),
 					Time:  time.Now(),
@@ -425,13 +425,13 @@ func TestPerformance_ConcurrentOperations(t *testing.T) {
 
 // TestPerformance_BackpressureHandling tests system behavior under backpressure
 func TestPerformance_BackpressureHandling(t *testing.T) {
-	s := CreateTestStream(t)
-	topic := Topic("performance.backpressure.test")
+	s := helpers.CreateTestStream(t)
+	topic := stream.Topic("performance.backpressure.test")
 	
 	processedCount := int64(0)
 	
 	// Slow subscriber to create backpressure
-	subscriber := SubscriberFunc(func(ctx context.Context, msg Message) error {
+	subscriber := stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		// Simulate slow processing
 		time.Sleep(10 * time.Millisecond)
 		atomic.AddInt64(&processedCount, 1)
@@ -450,7 +450,7 @@ func TestPerformance_BackpressureHandling(t *testing.T) {
 	publishStart := time.Now()
 	
 	for i := 0; i < messageCount; i++ {
-		msg := Message{
+		msg := stream.Message{
 			Topic: topic,
 			Data:  []byte(fmt.Sprintf("backpressure-test-%d", i)),
 			Time:  time.Now(),
@@ -481,8 +481,8 @@ func TestPerformance_BackpressureHandling(t *testing.T) {
 
 // TestPerformance_RegressionDetection tests for performance regressions
 func TestPerformance_RegressionDetection(t *testing.T) {
-	s := CreateTestStream(t)
-	topic := Topic("performance.regression.test")
+	s := helpers.CreateTestStream(t)
+	topic := stream.Topic("performance.regression.test")
 	
 	// Expected baseline performance (adjust based on your requirements)
 	expectedMinThroughput := 1000.0 // messages per second
@@ -492,7 +492,7 @@ func TestPerformance_RegressionDetection(t *testing.T) {
 	var totalLatency time.Duration
 	var latencyMutex sync.Mutex
 	
-	subscriber := SubscriberFunc(func(ctx context.Context, msg Message) error {
+	subscriber := stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		receiveTime := time.Now()
 		
 		if sendTimeStr, exists := msg.Headers["Send-Time"]; exists {
@@ -521,7 +521,7 @@ func TestPerformance_RegressionDetection(t *testing.T) {
 	
 	for i := 0; i < messageCount; i++ {
 		sendTime := time.Now()
-		msg := Message{
+		msg := stream.Message{
 			Topic: topic,
 			Data:  []byte(fmt.Sprintf("regression-test-%d", i)),
 			Headers: map[string]string{
@@ -558,5 +558,5 @@ func TestPerformance_RegressionDetection(t *testing.T) {
 	assert.LessOrEqual(t, avgLatency, expectedMaxLatency, 
 		"Latency regression detected: %v > %v", avgLatency, expectedMaxLatency)
 	assert.GreaterOrEqual(t, received, int64(messageCount*90/100), 
-		"Message delivery regression detected")
+		"stream.Message delivery regression detected")
 }

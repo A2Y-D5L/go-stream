@@ -44,13 +44,13 @@ func WithReplyTo(t topic.Topic) Option {
 	return func(c *config) { c.replyTo = string(t) }
 }
 
-// WithMessageID sets/overrides the X-Message-Id header.
+// WithMessageID sets/overrides the X-message.Message-Id header.
 func WithMessageID(id string) Option {
 	return func(c *config) {
 		if c.headers == nil {
 			c.headers = make(map[string]string, 1)
 		}
-		c.headers["X-Message-Id"] = id
+		c.headers["X-message.Message-Id"] = id
 	}
 }
 

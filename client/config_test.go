@@ -24,7 +24,7 @@ func TestConfig_Defaults(t *testing.T) {
 		assert.Equal(t, 2*time.Second, cfg.ConnectTimeout)
 		assert.Equal(t, 2*time.Second, cfg.ConnectFlushTimeout)
 		assert.Equal(t, 250*time.Millisecond, cfg.ReconnectWaitMin)
-		assert.Equal(t, topic.TopicModeCore, cfg.DefaultTopicMode)
+		assert.Equal(t, topic.ModeCore, cfg.DefaultTopicMode)
 		assert.Equal(t, message.JSONCodec, cfg.DefaultCodec)
 		assert.Equal(t, "X-Request-Id", cfg.RequestIDHeader)
 		assert.Empty(t, cfg.User)
@@ -43,7 +43,7 @@ func TestConfig_Defaults(t *testing.T) {
 		assert.Equal(t, 0, cfg.MaxPayload)
 		assert.Equal(t, time.Duration(0), cfg.ServerReadyTimeout)
 		assert.Empty(t, cfg.ClientName)
-		assert.Equal(t, topic.TopicMode(0), cfg.DefaultTopicMode)
+		assert.Equal(t, topic.Mode(0), cfg.DefaultTopicMode)
 		assert.Nil(t, cfg.DefaultCodec)
 	})
 }
@@ -63,16 +63,13 @@ func TestConfig_WithHost(t *testing.T) {
 
 	t.Run("empty host", func(t *testing.T) {
 		cfg := defaultConfig()
-
 		WithHost("")(&cfg)
-
 		assert.Equal(t, "", cfg.Host)
 	})
 
 	t.Run("FQDN host", func(t *testing.T) {
 		cfg := defaultConfig()
 		WithHost("nats.example.com")(&cfg)
-
 		assert.Equal(t, "nats.example.com", cfg.Host)
 	})
 }
@@ -81,28 +78,24 @@ func TestConfig_WithPort(t *testing.T) {
 	t.Run("valid port", func(t *testing.T) {
 		cfg := defaultConfig()
 		WithPort(4222)(&cfg)
-
 		assert.Equal(t, 4222, cfg.Port)
 	})
 
 	t.Run("high port number", func(t *testing.T) {
 		cfg := defaultConfig()
 		WithPort(65535)(&cfg)
-
 		assert.Equal(t, 65535, cfg.Port)
 	})
 
 	t.Run("zero port", func(t *testing.T) {
 		cfg := defaultConfig()
 		WithPort(0)(&cfg)
-
 		assert.Equal(t, 0, cfg.Port)
 	})
 
 	t.Run("random port", func(t *testing.T) {
 		cfg := defaultConfig()
 		WithRandomPort()(&cfg)
-
 		assert.Equal(t, -1, cfg.Port)
 	})
 }
@@ -110,17 +103,13 @@ func TestConfig_WithPort(t *testing.T) {
 func TestConfig_WithTLS(t *testing.T) {
 	t.Run("valid TLS config", func(t *testing.T) {
 		cfg := defaultConfig()
-		tlsConfig := &tls.Config{ServerName: "example.com"}
-		WithTLS(tlsConfig)(&cfg)
-
-		assert.Equal(t, tlsConfig, cfg.TLS)
-		assert.Equal(t, "example.com", cfg.TLS.ServerName)
+		WithTLS(&tls.Config{ServerName: "example.com"})(&cfg)
+		assert.Equal(t, &tls.Config{ServerName: "example.com"}, cfg.TLS)
 	})
 
 	t.Run("nil TLS config", func(t *testing.T) {
 		cfg := defaultConfig()
 		WithTLS(nil)(&cfg)
-
 		assert.Nil(t, cfg.TLS)
 	})
 }
@@ -129,7 +118,6 @@ func TestConfig_WithStoreDir(t *testing.T) {
 	t.Run("valid store directory", func(t *testing.T) {
 		cfg := defaultConfig()
 		WithStoreDir("/tmp/jetstream")(&cfg)
-
 		assert.Equal(t, "/tmp/jetstream", cfg.StoreDir)
 	})
 
@@ -176,16 +164,16 @@ func TestConfig_WithMaxPayload(t *testing.T) {
 func TestConfig_WithDefaultTopicMode(t *testing.T) {
 	t.Run("core topic mode", func(t *testing.T) {
 		cfg := defaultConfig()
-		WithDefaultTopicMode(topic.TopicModeCore)(&cfg)
+		WithDefaultTopicMode(topic.ModeCore)(&cfg)
 
-		assert.Equal(t, topic.TopicModeCore, cfg.DefaultTopicMode)
+		assert.Equal(t, topic.ModeCore, cfg.DefaultTopicMode)
 	})
 
 	t.Run("jetstream topic mode", func(t *testing.T) {
 		cfg := defaultConfig()
-		WithDefaultTopicMode(topic.TopicModeJetStream)(&cfg)
+		WithDefaultTopicMode(topic.ModeJetStream)(&cfg)
 
-		assert.Equal(t, topic.TopicModeJetStream, cfg.DefaultTopicMode)
+		assert.Equal(t, topic.ModeJetStream, cfg.DefaultTopicMode)
 	})
 }
 
@@ -313,14 +301,14 @@ func TestConfig_MultipleOptions(t *testing.T) {
 		WithPort(8222)(&cfg)
 		WithMaxPayload(2048)(&cfg)
 		WithConnectTimeout(5 * time.Second)(&cfg)
-		WithDefaultTopicMode(topic.TopicModeJetStream)(&cfg)
+		WithDefaultTopicMode(topic.ModeJetStream)(&cfg)
 		WithRequestIDHeader("X-Trace-ID")(&cfg)
 
 		assert.Equal(t, "192.168.1.100", cfg.Host)
 		assert.Equal(t, 8222, cfg.Port)
 		assert.Equal(t, 2048, cfg.MaxPayload)
 		assert.Equal(t, 5*time.Second, cfg.ConnectTimeout)
-		assert.Equal(t, topic.TopicModeJetStream, cfg.DefaultTopicMode)
+		assert.Equal(t, topic.ModeJetStream, cfg.DefaultTopicMode)
 		assert.Equal(t, "X-Trace-ID", cfg.RequestIDHeader)
 	})
 
@@ -424,7 +412,7 @@ func TestConfig_Integration(t *testing.T) {
 		WithPort(4222)(&cfg)
 		WithMaxPayload(10 * 1024 * 1024)(&cfg) // 10MB
 		WithStoreDir("/data/jetstream")(&cfg)
-		WithDefaultTopicMode(topic.TopicModeJetStream)(&cfg)
+		WithDefaultTopicMode(topic.ModeJetStream)(&cfg)
 		WithConnectTimeout(10 * time.Second)(&cfg)
 		WithReconnectWait(500 * time.Millisecond)(&cfg)
 		WithDrainTimeout(30 * time.Second)(&cfg)
@@ -436,7 +424,7 @@ func TestConfig_Integration(t *testing.T) {
 		assert.Equal(t, 4222, cfg.Port)
 		assert.Equal(t, 10*1024*1024, cfg.MaxPayload)
 		assert.Equal(t, "/data/jetstream", cfg.StoreDir)
-		assert.Equal(t, topic.TopicModeJetStream, cfg.DefaultTopicMode)
+		assert.Equal(t, topic.ModeJetStream, cfg.DefaultTopicMode)
 		assert.Equal(t, 10*time.Second, cfg.ConnectTimeout)
 		assert.Equal(t, 500*time.Millisecond, cfg.ReconnectWaitMin)
 		assert.Equal(t, 30*time.Second, cfg.ServerShutdownMaxWait)

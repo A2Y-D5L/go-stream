@@ -5,7 +5,7 @@
 //   - github.com/a2y-d5l/go-stream/client    - Main Stream type and configuration
 //   - github.com/a2y-d5l/go-stream/pub       - Publishing functionality
 //   - github.com/a2y-d5l/go-stream/sub       - Subscription functionality
-//   - github.com/a2y-d5l/go-stream/message   - Message types and codecs
+//   - github.com/a2y-d5l/go-stream/message   - message.Message types and codecs
 //   - github.com/a2y-d5l/go-stream/topic     - Topic types and management
 //
 // The root package maintains backward compatibility by providing the same API
@@ -20,13 +20,13 @@
 //	defer s.Close(ctx)
 //
 //	// Publishing
-//	err = s.Publish(ctx, "events.user.created", stream.Message{
+//	err = s.Publish(ctx, "events.user.created", stream.message.Message{
 //		Data: []byte(`{"user_id": "123"}`),
 //	})
 //
 //	// Subscribing
 //	sub, err := s.Subscribe("events.user.created",
-//		stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
+//		stream.sub.SubscriberFunc(func(ctx context.Context, msg stream.message.Message) error {
 //			log.Printf("Received: %s", msg.Data)
 //			return nil
 //		}))

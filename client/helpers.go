@@ -12,33 +12,33 @@ import (
 )
 
 // Stream methods facade
-func (s *Stream) Publish(ctx context.Context, t topic.Topic, msg message.Message, opts ...pub.PublishOption) error {
+func (s *Stream) Publish(ctx context.Context, t topic.Topic, msg message.Message, opts ...pub.Option) error {
 	publisher := pub.NewStreamPublisher(s.GetNATSConnection(), s.Healthy, time.Second*2)
 	return publisher.Publish(ctx, t, msg, opts...)
 }
 
-func (s *Stream) PublishJSON(ctx context.Context, t topic.Topic, v any, opts ...pub.PublishOption) error {
+func (s *Stream) PublishJSON(ctx context.Context, t topic.Topic, v any, opts ...pub.Option) error {
 	publisher := pub.NewStreamPublisher(s.GetNATSConnection(), s.Healthy, time.Second*2)
 	return publisher.PublishJSON(ctx, t, v, opts...)
 }
 
-func (s *Stream) Request(ctx context.Context, t topic.Topic, msg message.Message, timeout time.Duration, opts ...pub.PublishOption) (message.Message, error) {
+func (s *Stream) Request(ctx context.Context, t topic.Topic, msg message.Message, timeout time.Duration, opts ...pub.Option) (message.Message, error) {
 	publisher := pub.NewStreamPublisher(s.GetNATSConnection(), s.Healthy, time.Second*2)
 	return publisher.Request(ctx, t, msg, timeout, opts...)
 }
 
-func (s *Stream) Subscribe(t topic.Topic, subscriber sub.Subscriber, opts ...sub.SubscribeOption) (sub.Subscription, error) {
+func (s *Stream) Subscribe(t topic.Topic, subscriber sub.Subscriber, opts ...sub.Option) (sub.Subscription, error) {
 	ss := sub.NewStreamSubscriber(s.GetNATSConnection(), s.Healthy, time.Second*2, nil)
 	return ss.Subscribe(t, subscriber, opts...)
 }
 
 // Generic helpers
-func RequestJSON[T any](s *Stream, ctx context.Context, t topic.Topic, req any, timeout time.Duration, opts ...PublishOption) (T, error) {
+func RequestJSON[T any](s *Stream, ctx context.Context, t topic.Topic, req any, timeout time.Duration, opts ...pub.Option) (T, error) {
 	publisher := pub.NewStreamPublisher(s.GetNATSConnection(), s.Healthy, time.Second*2)
 	return pub.RequestJSON[T](publisher, ctx, t, req, timeout, opts...)
 }
 
-func SubscribeJSON[T any](s *Stream, t topic.Topic, handler func(context.Context, T) error, opts ...sub.SubscribeOption) (sub.Subscription, error) {
+func SubscribeJSON[T any](s *Stream, t topic.Topic, handler func(context.Context, T) error, opts ...sub.Option) (sub.Subscription, error) {
 	adapter := sub.SubscriberFunc(func(ctx context.Context, msg message.Message) error {
 		var data T
 		if len(msg.Data) == 0 {

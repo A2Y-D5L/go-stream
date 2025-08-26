@@ -9,6 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/a2y-d5l/go-stream"
+	"github.com/a2y-d5l/go-stream/sub"
+	"github.com/a2y-d5l/go-stream/test/helpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,16 +26,16 @@ func TestConcurrency_100ConcurrentPublishers(t *testing.T) {
 		t.Skip("Skipping concurrency test in short mode")
 	}
 	
-	s := CreateTestStream(t)
-	topic := Topic("concurrency.publishers")
+	s := helpers.CreateTestStream(t)
+	topic := stream.Topic("concurrency.publishers")
 	
-	received := make(chan Message, 10000)
-	subscriber := SubscriberFunc(func(ctx context.Context, msg Message) error {
+	received := make(chan stream.Message, 10000)
+	subscriber := sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		received <- msg
 		return nil
 	})
 	
-	sub, err := s.Subscribe(topic, subscriber, WithConcurrency(10))
+	sub, err := s.Subscribe(topic, subscriber, sub.WithConcurrency(10))
 	require.NoError(t, err)
 	defer sub.Stop()
 	
@@ -56,12 +59,12 @@ func TestConcurrency_100ConcurrentPublishers(t *testing.T) {
 			defer cancel()
 			
 			for j := 0; j < messagesPerPublisher; j++ {
-				msg := Message{
+				msg := stream.Message{
 					Topic: topic,
 					Data:  []byte(fmt.Sprintf("publisher-%d-message-%d", publisherID, j)),
 					Headers: map[string]string{
 						"Publisher-ID": fmt.Sprintf("%d", publisherID),
-						"Message-Seq":  fmt.Sprintf("%d", j),
+						"stream.Message-Seq":  fmt.Sprintf("%d", j),
 					},
 					Time: time.Now(),
 				}
@@ -102,21 +105,21 @@ func TestConcurrency_100ConcurrentSubscribers(t *testing.T) {
 		t.Skip("Skipping concurrency test in short mode")
 	}
 	
-	s := CreateTestStream(t)
-	topic := Topic("concurrency.subscribers")
+	s := helpers.CreateTestStream(t)
+	topic := stream.Topic("concurrency.subscribers")
 	
 	numSubscribers := 100
 	numMessages := 1000
 	
 	// Track messages per subscriber
 	subscriberCounts := make([]int64, numSubscribers)
-	subscribers := make([]Subscription, numSubscribers)
+	subscribers := make([]stream.Subscription, numSubscribers)
 	
 	// Create subscribers with different queue groups (each gets all messages)
 	for i := 0; i < numSubscribers; i++ {
 		index := i // Capture for closure
 		
-		subscriber := SubscriberFunc(func(ctx context.Context, msg Message) error {
+		subscriber := sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 			atomic.AddInt64(&subscriberCounts[index], 1)
 			// Simulate varying processing times
 			processingTime := time.Duration(index%10) * time.Millisecond
@@ -125,8 +128,8 @@ func TestConcurrency_100ConcurrentSubscribers(t *testing.T) {
 		})
 		
 		sub, err := s.Subscribe(topic, subscriber, 
-			WithQueueGroupName(fmt.Sprintf("subscriber-group-%d", i)),
-			WithConcurrency(2))
+			sub.WithQueueGroupName(fmt.Sprintf("subscriber-group-%d", i)),
+			sub.WithConcurrency(2))
 		require.NoError(t, err)
 		subscribers[i] = sub
 		defer sub.Stop()
@@ -140,11 +143,11 @@ func TestConcurrency_100ConcurrentSubscribers(t *testing.T) {
 	
 	// Publish messages
 	for i := 0; i < numMessages; i++ {
-		msg := Message{
+		msg := stream.Message{
 			Topic: topic,
 			Data:  []byte(fmt.Sprintf("broadcast message %d", i)),
 			Headers: map[string]string{
-				"Message-ID": fmt.Sprintf("msg-%d", i),
+				"stream.Message-ID": fmt.Sprintf("msg-%d", i),
 			},
 			Time: time.Now(),
 		}
@@ -189,11 +192,11 @@ func TestConcurrency_MixedConcurrentOperations(t *testing.T) {
 		t.Skip("Skipping mixed concurrency test in short mode")
 	}
 	
-	s := CreateTestStream(t)
+	s := helpers.CreateTestStream(t)
 	
 	// Multiple topics for different operation types
-	pubsubTopic := Topic("concurrency.mixed.pubsub")
-	requestTopic := Topic("concurrency.mixed.request")
+	pubsubTopic := stream.Topic("concurrency.mixed.pubsub")
+	requestTopic := stream.Topic("concurrency.mixed.request")
 	
 	// Track different operation types
 	pubsubReceived := int64(0)
@@ -201,23 +204,23 @@ func TestConcurrency_MixedConcurrentOperations(t *testing.T) {
 	responsesReceived := int64(0)
 	
 	// Pub/Sub subscriber
-	pubsubSubscriber := SubscriberFunc(func(ctx context.Context, msg Message) error {
+	pubsubSubscriber := sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		atomic.AddInt64(&pubsubReceived, 1)
 		time.Sleep(1 * time.Millisecond) // Simulate work
 		return nil
 	})
-	
-	pubsubSub, err := s.Subscribe(pubsubTopic, pubsubSubscriber, WithConcurrency(5))
+
+	pubsubSub, err := s.Subscribe(pubsubTopic, pubsubSubscriber, sub.WithConcurrency(5))
 	require.NoError(t, err)
 	defer pubsubSub.Stop()
 	
 	// Request responder
-	responder := SubscriberFunc(func(ctx context.Context, msg Message) error {
+	responder := sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		atomic.AddInt64(&requestsReceived, 1)
 		
 		// Send response
-		response := Message{
-			Topic: Topic(msg.Headers["Reply-To"]),
+		response := stream.Message{
+			Topic: stream.Topic(msg.Headers["Reply-To"]),
 			Data:  []byte("response-" + string(msg.Data)),
 			Headers: map[string]string{
 				"Request-ID": msg.Headers["Request-ID"],
@@ -226,12 +229,12 @@ func TestConcurrency_MixedConcurrentOperations(t *testing.T) {
 		}
 		
 		if replyTo := msg.Headers["Reply-To"]; replyTo != "" {
-			return s.Publish(ctx, Topic(replyTo), response)
+			return s.Publish(ctx, stream.Topic(replyTo), response)
 		}
 		return nil
 	})
-	
-	requestSub, err := s.Subscribe(requestTopic, responder, WithConcurrency(3))
+
+	requestSub, err := s.Subscribe(requestTopic, responder, sub.WithConcurrency(3))
 	require.NoError(t, err)
 	defer requestSub.Stop()
 	
@@ -247,7 +250,7 @@ func TestConcurrency_MixedConcurrentOperations(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for i := 0; i < 500; i++ {
-			msg := Message{
+			msg := stream.Message{
 				Topic: pubsubTopic,
 				Data:  []byte(fmt.Sprintf("pubsub-msg-%d", i)),
 				Time:  time.Now(),
@@ -264,7 +267,7 @@ func TestConcurrency_MixedConcurrentOperations(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for i := 0; i < 200; i++ {
-			request := Message{
+			request := stream.Message{
 				Topic: requestTopic,
 				Data:  []byte(fmt.Sprintf("request-%d", i)),
 				Headers: map[string]string{
@@ -291,10 +294,10 @@ func TestConcurrency_MixedConcurrentOperations(t *testing.T) {
 		defer wg.Done()
 		for i := 0; i < 5; i++ {
 			// Create temporary subscribers
-			tempTopic := Topic(fmt.Sprintf("concurrency.temp.%d", i))
+			tempTopic := stream.Topic(fmt.Sprintf("concurrency.temp.%d", i))
 			tempReceived := int64(0)
 			
-			tempSubscriber := SubscriberFunc(func(ctx context.Context, msg Message) error {
+			tempSubscriber := sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 				atomic.AddInt64(&tempReceived, 1)
 				return nil
 			})
@@ -307,7 +310,7 @@ func TestConcurrency_MixedConcurrentOperations(t *testing.T) {
 			
 			// Send messages to temp topic
 			for j := 0; j < 10; j++ {
-				msg := Message{
+				msg := stream.Message{
 					Topic: tempTopic,
 					Data:  []byte(fmt.Sprintf("temp-msg-%d-%d", i, j)),
 					Time:  time.Now(),
@@ -348,8 +351,8 @@ func TestConcurrency_MixedConcurrentOperations(t *testing.T) {
 
 // TestConcurrency_LoadBalancingAcrossSubscribers tests load balancing
 func TestConcurrency_LoadBalancingAcrossSubscribers(t *testing.T) {
-	s := CreateTestStream(t)
-	topic := Topic("concurrency.load.balancing")
+	s := helpers.CreateTestStream(t)
+	topic := stream.Topic("concurrency.load.balancing")
 	
 	numSubscribers := 5
 	subscriberCounts := make([]int64, numSubscribers)
@@ -358,15 +361,15 @@ func TestConcurrency_LoadBalancingAcrossSubscribers(t *testing.T) {
 	for i := 0; i < numSubscribers; i++ {
 		index := i // Capture for closure
 		
-		subscriber := SubscriberFunc(func(ctx context.Context, msg Message) error {
+		subscriber := sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 			atomic.AddInt64(&subscriberCounts[index], 1)
 			// Simulate varying processing times
 			processingTime := time.Duration((index+1)*5) * time.Millisecond
 			time.Sleep(processingTime)
 			return nil
 		})
-		
-		sub, err := s.Subscribe(topic, subscriber, WithQueueGroupName("load-balance-group"))
+
+		sub, err := s.Subscribe(topic, subscriber, sub.WithQueueGroupName("load-balance-group"))
 		require.NoError(t, err)
 		defer sub.Stop()
 	}
@@ -380,11 +383,11 @@ func TestConcurrency_LoadBalancingAcrossSubscribers(t *testing.T) {
 	// Publish messages
 	numMessages := 500
 	for i := 0; i < numMessages; i++ {
-		msg := Message{
+		msg := stream.Message{
 			Topic: topic,
 			Data:  []byte(fmt.Sprintf("load-balance-msg-%d", i)),
 			Headers: map[string]string{
-				"Message-ID": fmt.Sprintf("lb-%d", i),
+				"stream.Message-ID": fmt.Sprintf("lb-%d", i),
 			},
 			Time: time.Now(),
 		}
@@ -424,13 +427,13 @@ func TestConcurrency_ResourceSharingUnderHighLoad(t *testing.T) {
 		t.Skip("Skipping resource sharing test in short mode")
 	}
 	
-	s := CreateTestStream(t)
+	s := helpers.CreateTestStream(t)
 	
 	// Multiple topics competing for resources
-	topics := []Topic{
-		Topic("concurrency.resource.topic1"),
-		Topic("concurrency.resource.topic2"),
-		Topic("concurrency.resource.topic3"),
+	topics := []stream.Topic{
+		stream.Topic("concurrency.resource.topic1"),
+		stream.Topic("concurrency.resource.topic2"),
+		stream.Topic("concurrency.resource.topic3"),
 	}
 	
 	// Track processing per topic
@@ -440,16 +443,16 @@ func TestConcurrency_ResourceSharingUnderHighLoad(t *testing.T) {
 	for i, topic := range topics {
 		index := i // Capture for closure
 		
-		subscriber := SubscriberFunc(func(ctx context.Context, msg Message) error {
+		subscriber := sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 			atomic.AddInt64(&topicCounts[index], 1)
 			// Simulate CPU-intensive work
 			time.Sleep(2 * time.Millisecond)
 			return nil
 		})
-		
-		sub, err := s.Subscribe(topic, subscriber, 
-			WithConcurrency(5),
-			WithBufferSize(100))
+
+		sub, err := s.Subscribe(topic, subscriber,
+			sub.WithConcurrency(5),
+			sub.WithBufferSize(100))
 		require.NoError(t, err)
 		defer sub.Stop()
 	}
@@ -465,16 +468,16 @@ func TestConcurrency_ResourceSharingUnderHighLoad(t *testing.T) {
 	messagesPerTopic := 300
 	for i, topic := range topics {
 		wg.Add(1)
-		go func(topicIndex int, topicObj Topic) {
+		go func(topicIndex int, topicObj stream.Topic) {
 			defer wg.Done()
 			
 			for j := 0; j < messagesPerTopic; j++ {
-				msg := Message{
+				msg := stream.Message{
 					Topic: topicObj,
 					Data:  []byte(fmt.Sprintf("topic%d-msg-%d", topicIndex, j)),
 					Headers: map[string]string{
 						"Topic-Index": fmt.Sprintf("%d", topicIndex),
-						"Message-ID":  fmt.Sprintf("t%d-m%d", topicIndex, j),
+						"stream.Message-ID":  fmt.Sprintf("t%d-m%d", topicIndex, j),
 					},
 					Time: time.Now(),
 				}
@@ -534,13 +537,13 @@ func TestStress_SustainedLoad(t *testing.T) {
 		t.Skip("Skipping stress test in short mode")
 	}
 	
-	s := CreateTestStream(t)
-	topic := Topic("stress.sustained.load")
+	s := helpers.CreateTestStream(t)
+	topic := stream.Topic("stress.sustained.load")
 	
 	processed := int64(0)
 	errors := int64(0)
 	
-	subscriber := SubscriberFunc(func(ctx context.Context, msg Message) error {
+	subscriber := sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		atomic.AddInt64(&processed, 1)
 		
 		// Simulate varying workloads
@@ -552,10 +555,10 @@ func TestStress_SustainedLoad(t *testing.T) {
 		
 		return nil
 	})
-	
-	sub, err := s.Subscribe(topic, subscriber, 
-		WithConcurrency(10),
-		WithBufferSize(1000))
+
+	sub, err := s.Subscribe(topic, subscriber,
+		sub.WithConcurrency(10),
+		sub.WithBufferSize(1000))
 	require.NoError(t, err)
 	defer sub.Stop()
 	
@@ -597,11 +600,11 @@ func TestStress_SustainedLoad(t *testing.T) {
 					data = []byte(fmt.Sprintf("light-task-%d", id))
 				}
 				
-				msg := Message{
+				msg := stream.Message{
 					Topic: topic,
 					Data:  data,
 					Headers: map[string]string{
-						"Message-ID": fmt.Sprintf("%d", id),
+						"stream.Message-ID": fmt.Sprintf("%d", id),
 						"Timestamp":  time.Now().Format(time.RFC3339Nano),
 					},
 					Time: time.Now(),
@@ -665,20 +668,20 @@ func TestStress_MemoryUsageStabilityOverTime(t *testing.T) {
 		t.Skip("Skipping memory stress test in short mode")
 	}
 	
-	s := CreateTestStream(t)
-	topic := Topic("stress.memory.stability")
+	s := helpers.CreateTestStream(t)
+	topic := stream.Topic("stress.memory.stability")
 	
 	// Record memory stats
 	var memStats []runtime.MemStats
 	
-	subscriber := SubscriberFunc(func(ctx context.Context, msg Message) error {
+	subscriber := sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		// Create some temporary data to simulate real workloads
 		_ = make([]byte, 1024) // 1KB per message
 		time.Sleep(1 * time.Millisecond)
 		return nil
 	})
-	
-	sub, err := s.Subscribe(topic, subscriber, WithConcurrency(5))
+
+	sub, err := s.Subscribe(topic, subscriber, sub.WithConcurrency(5))
 	require.NoError(t, err)
 	defer sub.Stop()
 	
@@ -702,12 +705,12 @@ func TestStress_MemoryUsageStabilityOverTime(t *testing.T) {
 		
 		// Publish messages
 		for i := 0; i < messagesPerCycle; i++ {
-			msg := Message{
+			msg := stream.Message{
 				Topic: topic,
 				Data:  make([]byte, 2048), // 2KB message
 				Headers: map[string]string{
 					"Cycle":      fmt.Sprintf("%d", cycle),
-					"Message-ID": fmt.Sprintf("c%d-m%d", cycle, i),
+					"stream.Message-ID": fmt.Sprintf("c%d-m%d", cycle, i),
 				},
 				Time: time.Now(),
 			}
@@ -769,8 +772,8 @@ func TestStress_ConnectionStabilityUnderStress(t *testing.T) {
 		t.Skip("Skipping connection stress test in short mode")
 	}
 	
-	s := CreateTestStream(t)
-	topic := Topic("stress.connection.stability")
+	s := helpers.CreateTestStream(t)
+	topic := stream.Topic("stress.connection.stability")
 	
 	// Create many short-lived subscribers
 	numCycles := 20
@@ -793,14 +796,14 @@ func TestStress_ConnectionStabilityUnderStress(t *testing.T) {
 				
 				received := int64(0)
 				
-				subscriber := SubscriberFunc(func(ctx context.Context, msg Message) error {
+				subscriber := sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 					atomic.AddInt64(&received, 1)
 					time.Sleep(1 * time.Millisecond)
 					return nil
 				})
 				
 				sub, err := s.Subscribe(topic, subscriber,
-					WithQueueGroupName(fmt.Sprintf("cycle-%d-sub-%d", cycle, subID)))
+					sub.WithQueueGroupName(fmt.Sprintf("cycle-%d-sub-%d", cycle, subID)))
 				if err != nil {
 					t.Errorf("Failed to create subscriber %d in cycle %d: %v", subID, cycle, err)
 					return
@@ -811,13 +814,13 @@ func TestStress_ConnectionStabilityUnderStress(t *testing.T) {
 				
 				// Publish messages for this subscriber
 				for j := 0; j < messagesPerSubscriber; j++ {
-					msg := Message{
+					msg := stream.Message{
 						Topic: topic,
 						Data:  []byte(fmt.Sprintf("cycle-%d-sub-%d-msg-%d", cycle, subID, j)),
 						Headers: map[string]string{
 							"Cycle":        fmt.Sprintf("%d", cycle),
 							"Subscriber":   fmt.Sprintf("%d", subID),
-							"Message-Seq":  fmt.Sprintf("%d", j),
+							"stream.Message-Seq":  fmt.Sprintf("%d", j),
 						},
 						Time: time.Now(),
 					}
@@ -852,7 +855,7 @@ func TestStress_ConnectionStabilityUnderStress(t *testing.T) {
 	}
 	
 	// Verify the original stream is still healthy
-	healthMsg := Message{
+	healthMsg := stream.Message{
 		Topic: topic,
 		Data:  []byte("health-check"),
 		Time:  time.Now(),

@@ -31,7 +31,7 @@ func WithStoreDir(dir string) Option { return func(c *config) { c.StoreDir = dir
 func WithMaxPayload(bytes int) Option { return func(c *config) { c.MaxPayload = bytes } }
 
 // WithDefaultTopicMode sets the default topic mode for new topics (Core or JetStream).
-func WithDefaultTopicMode(m topic.TopicMode) Option { return func(c *config) { c.DefaultTopicMode = m } }
+func WithDefaultTopicMode(m topic.Mode) Option { return func(c *config) { c.DefaultTopicMode = m } }
 
 // WithDefaultCodec overrides the default codec (JSON by default).
 func WithDefaultCodec(cd message.Codec) Option { return func(c *config) { c.DefaultCodec = cd } }

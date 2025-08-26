@@ -46,24 +46,24 @@ func (p *Pattern) String() string {
 // ValidatePattern validates a topic pattern
 func ValidatePattern(pattern string) error {
 	if pattern == "" {
-		return ErrInvalidTopic
+		return ErrInvalidName
 	}
 
 	// Check for invalid characters and patterns
 	tokens := strings.Split(pattern, ".")
 	for i, token := range tokens {
 		if token == "" && i < len(tokens)-1 {
-			return ErrInvalidTopic
+			return ErrInvalidName
 		}
 		
 		// > can only be at the end
 		if strings.Contains(token, ">") && i != len(tokens)-1 {
-			return ErrInvalidTopic
+			return ErrInvalidName
 		}
 		
 		// > must be the entire token
 		if strings.Contains(token, ">") && token != ">" {
-			return ErrInvalidTopic
+			return ErrInvalidName
 		}
 	}
 

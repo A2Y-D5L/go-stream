@@ -5,32 +5,31 @@ import (
 	"testing"
 	"time"
 
+	"github.com/a2y-d5l/go-stream"
+	"github.com/a2y-d5l/go-stream/test/helpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // TestExamples_BasicUsage tests the basic usage example from README
 func TestExamples_BasicUsage(t *testing.T) {
-	s := CreateTestStream(t)
-	topic := Topic("examples.basic.test")
+	s := helpers.CreateTestStream(t)
+	topic := stream.Topic("examples.basic.test")
 
 	// Test basic publish/subscribe pattern
-	received := make(chan Message, 10)
-	
-	subscriber := SubscriberFunc(func(ctx context.Context, msg Message) error {
+	received := make(chan stream.Message, 10)
+	sub, err := s.Subscribe(topic, stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		received <- msg
 		return nil
-	})
-
-	sub, err := s.Subscribe(topic, subscriber)
+	}))
 	require.NoError(t, err)
 	defer sub.Stop()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 
 	// Publish a simple message
-	msg := Message{
+	msg := stream.Message{
 		Topic: topic,
 		Data:  []byte("Hello, World!"),
 		Headers: map[string]string{
@@ -49,21 +48,21 @@ func TestExamples_BasicUsage(t *testing.T) {
 		assert.Equal(t, msg.Data, receivedMsg.Data)
 		assert.Equal(t, msg.Headers["Content-Type"], receivedMsg.Headers["Content-Type"])
 	case <-time.After(5 * time.Second):
-		t.Fatal("Message not received within timeout")
+		t.Fatal("stream.Message not received within timeout")
 	}
 }
 
 // TestExamples_RequestReplyPattern tests request-reply messaging pattern
 func TestExamples_RequestReplyPattern(t *testing.T) {
-	s := CreateTestStream(t)
-	requestTopic := Topic("examples.request")
-	replyTopic := Topic("examples.reply")
+	s := helpers.CreateTestStream(t)
+	requestTopic := stream.Topic("examples.request")
+	replyTopic := stream.Topic("examples.reply")
 
-	// Set up responder
-	responder := SubscriberFunc(func(ctx context.Context, msg Message) error {
+	// Set up a subscriber that listens for requests and sends replies
+	reqSub, err := s.Subscribe(requestTopic, stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		if replyTo, exists := msg.Headers["Reply-To"]; exists && replyTo == string(replyTopic) {
-			response := Message{
-				Topic: Topic(replyTo),
+			response := stream.Message{
+				Topic: stream.Topic(replyTo),
 				Data:  []byte("Response: " + string(msg.Data)),
 				Headers: map[string]string{
 					"Content-Type":  "text/plain",
@@ -71,18 +70,16 @@ func TestExamples_RequestReplyPattern(t *testing.T) {
 				},
 				Time: time.Now(),
 			}
-			return s.Publish(ctx, Topic(replyTo), response)
+			return s.Publish(ctx, stream.Topic(replyTo), response)
 		}
 		return nil
-	})
-
-	reqSub, err := s.Subscribe(requestTopic, responder)
+	}))
 	require.NoError(t, err)
 	defer reqSub.Stop()
 
 	// Set up reply receiver
-	responses := make(chan Message, 10)
-	replyReceiver := SubscriberFunc(func(ctx context.Context, msg Message) error {
+	responses := make(chan stream.Message, 10)
+	replyReceiver := stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		responses <- msg
 		return nil
 	})
@@ -91,11 +88,11 @@ func TestExamples_RequestReplyPattern(t *testing.T) {
 	require.NoError(t, err)
 	defer replySub.Stop()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 
 	// Send request
-	request := Message{
+	request := stream.Message{
 		Topic: requestTopic,
 		Data:  []byte("Hello, Service!"),
 		Headers: map[string]string{
@@ -122,22 +119,22 @@ func TestExamples_RequestReplyPattern(t *testing.T) {
 
 // TestExamples_WorkQueuePattern tests work queue distribution pattern
 func TestExamples_WorkQueuePattern(t *testing.T) {
-	s := CreateTestStream(t)
-	workTopic := Topic("examples.work.queue")
+	s := helpers.CreateTestStream(t)
+	workTopic := stream.Topic("examples.work.queue")
 
 	// Track work distribution across multiple workers
-	worker1Jobs := make(chan Message, 10)
-	worker2Jobs := make(chan Message, 10)
+	worker1Jobs := make(chan stream.Message, 10)
+	worker2Jobs := make(chan stream.Message, 10)
 
 	// Worker 1
-	worker1 := SubscriberFunc(func(ctx context.Context, msg Message) error {
+	worker1 := stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		worker1Jobs <- msg
 		time.Sleep(10 * time.Millisecond) // Simulate work
 		return nil
 	})
 
 	// Worker 2
-	worker2 := SubscriberFunc(func(ctx context.Context, msg Message) error {
+	worker2 := stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		worker2Jobs <- msg
 		time.Sleep(10 * time.Millisecond) // Simulate work
 		return nil
@@ -151,13 +148,13 @@ func TestExamples_WorkQueuePattern(t *testing.T) {
 	require.NoError(t, err)
 	defer sub2.Stop()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 
 	// Send work items
 	jobCount := 10
-	for i := 0; i < jobCount; i++ {
-		job := Message{
+	for i := range jobCount {
+		job := stream.Message{
 			Topic: workTopic,
 			Data:  []byte("job-" + string(rune('0'+i))),
 			Headers: map[string]string{
@@ -185,12 +182,12 @@ func TestExamples_WorkQueuePattern(t *testing.T) {
 
 // TestExamples_EventSourcing tests event sourcing pattern
 func TestExamples_EventSourcing(t *testing.T) {
-	s := CreateTestStream(t)
-	eventTopic := Topic("examples.events")
+	s := helpers.CreateTestStream(t)
+	eventTopic := stream.Topic("examples.events")
 
 	// Event store
-	events := make([]Message, 0)
-	eventReceiver := SubscriberFunc(func(ctx context.Context, msg Message) error {
+	events := make([]stream.Message, 0)
+	eventReceiver := stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		events = append(events, msg)
 		return nil
 	})
@@ -199,7 +196,7 @@ func TestExamples_EventSourcing(t *testing.T) {
 	require.NoError(t, err)
 	defer sub.Stop()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 
 	// Publish sequence of events
@@ -213,7 +210,7 @@ func TestExamples_EventSourcing(t *testing.T) {
 	}
 
 	for i, event := range eventSequence {
-		msg := Message{
+		msg := stream.Message{
 			Topic: eventTopic,
 			Data:  []byte(event.data),
 			Headers: map[string]string{
@@ -240,28 +237,28 @@ func TestExamples_EventSourcing(t *testing.T) {
 
 // TestExamples_FanOutPattern tests fan-out messaging pattern
 func TestExamples_FanOutPattern(t *testing.T) {
-	s := CreateTestStream(t)
-	broadcastTopic := Topic("examples.broadcast")
+	s := helpers.CreateTestStream(t)
+	broadcastTopic := stream.Topic("examples.broadcast")
 
 	// Multiple services listening to the same events
-	emailService := make(chan Message, 10)
-	smsService := make(chan Message, 10)
-	auditService := make(chan Message, 10)
+	emailService := make(chan stream.Message, 10)
+	smsService := make(chan stream.Message, 10)
+	auditService := make(chan stream.Message, 10)
 
 	// Email notification service
-	emailSub := SubscriberFunc(func(ctx context.Context, msg Message) error {
+	emailSub := stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		emailService <- msg
 		return nil
 	})
 
 	// SMS notification service
-	smsSub := SubscriberFunc(func(ctx context.Context, msg Message) error {
+	smsSub := stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		smsService <- msg
 		return nil
 	})
 
 	// Audit logging service
-	auditSub := SubscriberFunc(func(ctx context.Context, msg Message) error {
+	auditSub := stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		auditService <- msg
 		return nil
 	})
@@ -278,11 +275,11 @@ func TestExamples_FanOutPattern(t *testing.T) {
 	require.NoError(t, err)
 	defer sub3.Stop()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 
 	// Broadcast an event
-	event := Message{
+	event := stream.Message{
 		Topic: broadcastTopic,
 		Data:  []byte(`{"eventType": "OrderPlaced", "orderId": "12345"}`),
 		Headers: map[string]string{
@@ -315,20 +312,20 @@ func TestExamples_FanOutPattern(t *testing.T) {
 
 // TestExamples_CompositeIntegration tests multiple patterns working together
 func TestExamples_CompositeIntegration(t *testing.T) {
-	s := CreateTestStream(t)
+	s := helpers.CreateTestStream(t)
 
 	// Topics for different patterns
-	orderTopic := Topic("examples.orders")
-	notificationTopic := Topic("examples.notifications")
-	auditTopic := Topic("examples.audit")
+	orderTopic := stream.Topic("examples.orders")
+	notificationTopic := stream.Topic("examples.notifications")
+	auditTopic := stream.Topic("examples.audit")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
 
 	// Order processor that fans out to notifications and audit
-	orderProcessor := SubscriberFunc(func(ctx context.Context, msg Message) error {
+	orderProcessor := stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		// Fan out to notification service
-		notification := Message{
+		notification := stream.Message{
 			Topic: notificationTopic,
 			Data:  []byte("Order processed: " + string(msg.Data)),
 			Headers: map[string]string{
@@ -342,7 +339,7 @@ func TestExamples_CompositeIntegration(t *testing.T) {
 		}
 
 		// Fan out to audit service
-		auditLog := Message{
+		auditLog := stream.Message{
 			Topic: auditTopic,
 			Data:  []byte("AUDIT: " + string(msg.Data)),
 			Headers: map[string]string{
@@ -354,14 +351,14 @@ func TestExamples_CompositeIntegration(t *testing.T) {
 		return s.Publish(ctx, auditTopic, auditLog)
 	})
 
-	notifications := make(chan Message, 10)
-	notificationService := SubscriberFunc(func(ctx context.Context, msg Message) error {
+	notifications := make(chan stream.Message, 10)
+	notificationService := stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		notifications <- msg
 		return nil
 	})
 
-	audits := make(chan Message, 10)
-	auditService := SubscriberFunc(func(ctx context.Context, msg Message) error {
+	audits := make(chan stream.Message, 10)
+	auditService := stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		audits <- msg
 		return nil
 	})
@@ -383,7 +380,7 @@ func TestExamples_CompositeIntegration(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Send an order
-	order := Message{
+	order := stream.Message{
 		Topic: orderTopic,
 		Data:  []byte(`{"orderId": "ORD-123", "amount": 99.99}`),
 		Headers: map[string]string{

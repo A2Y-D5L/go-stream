@@ -26,7 +26,7 @@ func (s *Stream) Healthy(ctx context.Context) error {
 		return fmt.Errorf("%w: client not initialized", ErrStreamUnhealthy)
 	case s.srv == nil:
 		return fmt.Errorf("%w: server not initialized", ErrStreamUnhealthy)
-	case s.js == nil && s.cfg.DefaultTopicMode == topic.TopicModeJetStream:
+	case s.js == nil && s.cfg.DefaultTopicMode == topic.ModeJetStream:
 		return fmt.Errorf("%w: durable stream not initialized", ErrStreamUnhealthy)
 	case s.nc.Status() != nats.CONNECTED:
 		return fmt.Errorf("%w: client not connected", ErrStreamUnhealthy)
