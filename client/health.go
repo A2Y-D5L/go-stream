@@ -138,7 +138,7 @@ func (m multiErr) Error() string {
 	if len(m) == 1 {
 		return m[0].Error()
 	}
-	msg := fmt.Sprintf("%d errors:", len(m))
+	msg := "multiple errors:"
 	for _, e := range m {
 		msg += "\n - " + e.Error()
 	}
