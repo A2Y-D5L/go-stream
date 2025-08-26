@@ -326,9 +326,8 @@ func TestConfig_MultipleOptions(t *testing.T) {
 
 func TestConfig_OptionTypes(t *testing.T) {
 	t.Run("option function signature", func(t *testing.T) {
-		var option Option = WithHost("test")
 		cfg := defaultConfig()
-		option(&cfg)
+		WithHost("test")(&cfg)
 
 		assert.Equal(t, "test", cfg.Host)
 	})

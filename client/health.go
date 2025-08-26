@@ -133,14 +133,14 @@ func (m *multiErr) add(err error) { *m = append(*m, err) }
 
 func (m multiErr) Error() string {
 	if len(m) == 0 {
-		return "no errors"
+		return ""
 	}
 	if len(m) == 1 {
 		return m[0].Error()
 	}
-	msg := fmt.Sprintf("%d errors: %s", len(m), m[0].Error())
-	for _, e := range m[1:] {
-		msg += "; " + e.Error()
+	msg := fmt.Sprintf("%d errors:", len(m))
+	for _, e := range m {
+		msg += "\n - " + e.Error()
 	}
 	return msg
 }
