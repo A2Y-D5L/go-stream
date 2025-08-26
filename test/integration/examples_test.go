@@ -75,7 +75,7 @@ func TestExamples_RequestReplyPattern(t *testing.T) {
 		return nil
 	}))
 	require.NoError(t, err)
-	defer reqSub.Stop()
+	defer require.NoError(t, reqSub.Stop())
 
 	// Set up reply receiver
 	responses := make(chan stream.Message, 10)
@@ -86,7 +86,7 @@ func TestExamples_RequestReplyPattern(t *testing.T) {
 
 	replySub, err := s.Subscribe(replyTopic, replyReceiver)
 	require.NoError(t, err)
-	defer replySub.Stop()
+	defer require.NoError(t, replySub.Stop())
 
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
@@ -240,40 +240,44 @@ func TestExamples_FanOutPattern(t *testing.T) {
 	s := helpers.CreateTestStream(t)
 	broadcastTopic := stream.Topic("examples.broadcast")
 
-	// Multiple services listening to the same events
-	emailService := make(chan stream.Message, 10)
-	smsService := make(chan stream.Message, 10)
-	auditService := make(chan stream.Message, 10)
-
 	// Email notification service
-	emailSub := stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
+	emailService := make(chan stream.Message, 10)
+	sub1, err := s.Subscribe(broadcastTopic, stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		emailService <- msg
 		return nil
-	})
+	}))
+	require.NoError(t, err)
+	defer func() {
+		if err := sub1.Stop(); err != nil {
+			t.Logf("Error stopping email subscription: %v", err)
+		}
+	}()
 
 	// SMS notification service
-	smsSub := stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
+	smsService := make(chan stream.Message, 10)
+	sub2, err := s.Subscribe(broadcastTopic, stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		smsService <- msg
 		return nil
-	})
+	}))
+	require.NoError(t, err)
+	defer func() {
+		if err := sub2.Stop(); err != nil {
+			t.Logf("Error stopping SMS subscription: %v", err)
+		}
+	}()
 
 	// Audit logging service
-	auditSub := stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
+	auditService := make(chan stream.Message, 10)
+	sub3, err := s.Subscribe(broadcastTopic, stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		auditService <- msg
 		return nil
-	})
-
-	sub1, err := s.Subscribe(broadcastTopic, emailSub)
+	}))
 	require.NoError(t, err)
-	defer sub1.Stop()
-
-	sub2, err := s.Subscribe(broadcastTopic, smsSub)
-	require.NoError(t, err)
-	defer sub2.Stop()
-
-	sub3, err := s.Subscribe(broadcastTopic, auditSub)
-	require.NoError(t, err)
-	defer sub3.Stop()
+	defer func() {
+		if err := sub3.Stop(); err != nil {
+			t.Logf("Error stopping audit subscription: %v", err)
+		}
+	}()
 
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
@@ -288,9 +292,7 @@ func TestExamples_FanOutPattern(t *testing.T) {
 		},
 		Time: time.Now(),
 	}
-
-	err = s.Publish(ctx, broadcastTopic, event)
-	require.NoError(t, err)
+	require.NoError(t, s.Publish(ctx, broadcastTopic, event))
 
 	// Wait for fan-out
 	time.Sleep(1 * time.Second)
@@ -366,15 +368,27 @@ func TestExamples_CompositeIntegration(t *testing.T) {
 	// Set up subscriptions
 	orderSub, err := s.Subscribe(orderTopic, orderProcessor)
 	require.NoError(t, err)
-	defer orderSub.Stop()
+	defer func() {
+		if err := orderSub.Stop(); err != nil {
+			t.Logf("Error stopping order subscription: %v", err)
+		}
+	}()
 
 	notifSub, err := s.Subscribe(notificationTopic, notificationService)
 	require.NoError(t, err)
-	defer notifSub.Stop()
+	defer func() {
+		if err := notifSub.Stop(); err != nil {
+			t.Logf("Error stopping notification subscription: %v", err)
+		}
+	}()
 
 	auditSub, err := s.Subscribe(auditTopic, auditService)
 	require.NoError(t, err)
-	defer auditSub.Stop()
+	defer func() {
+		if err := auditSub.Stop(); err != nil {
+			t.Logf("Error stopping audit subscription: %v", err)
+		}
+	}()
 
 	// Wait for subscriptions to establish
 	time.Sleep(100 * time.Millisecond)

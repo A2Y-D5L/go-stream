@@ -386,7 +386,9 @@ func TestCascadingFailureContainment(t *testing.T) {
 
 	defer func() {
 		for _, s := range subs {
-			s.Stop()
+			if err := s.Stop(); err != nil {
+				t.Logf("Error stopping subscription: %v", err)
+			}
 		}
 	}()
 

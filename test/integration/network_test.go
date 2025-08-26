@@ -362,7 +362,7 @@ func TestNetwork_NetworkLatencyImpact(t *testing.T) {
 
 	var totalLatency time.Duration
 	var maxLatency time.Duration
-	var minLatency time.Duration = time.Hour // Start with a large value
+	minLatency := time.Hour // Start with a large value
 
 	for range receivedLatencies {
 		latency := <-latencies

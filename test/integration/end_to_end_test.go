@@ -28,7 +28,7 @@ func TestIntegration_CompletePublishSubscribeFlow(t *testing.T) {
 	topic := stream.Topic("integration.complete.pubsub")
 
 	received := make(chan stream.Message, 100)
-	subscriber := sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
+	subscriber := stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		received <- msg
 		return nil
 	})
@@ -120,7 +120,7 @@ func TestIntegration_RequestReplyRoundTrip(t *testing.T) {
 	requestTopic := stream.Topic("integration.request")
 
 	// Set up responder
-	responder := sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
+	responder := stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		// Echo back with a response
 		response := stream.Message{
 			Topic: stream.Topic(msg.Headers["Reply-To"]),
@@ -140,7 +140,7 @@ func TestIntegration_RequestReplyRoundTrip(t *testing.T) {
 
 	subscription, err := s.Subscribe(requestTopic, responder)
 	require.NoError(t, err)
-	defer subscription.Stop()
+	defer require.NoError(t, subscription.Stop())
 
 	// Wait for subscription to establish
 	time.Sleep(100 * time.Millisecond)
@@ -176,7 +176,7 @@ func TestIntegration_MultiStreamCommunication(t *testing.T) {
 
 	// Set up subscriber on stream2
 	received := make(chan stream.Message, 10)
-	subscriber := sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
+	subscriber := stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		received <- msg
 		return nil
 	})
@@ -221,7 +221,7 @@ func TestIntegration_StreamLifecycleWithActiveSubscriptions(t *testing.T) {
 
 	// Set up subscriber
 	received := make(chan stream.Message, 10)
-	subscriber := sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
+	subscriber := stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		received <- msg
 		return nil
 	})
@@ -273,7 +273,7 @@ func TestIntegration_GracefulShutdownWithInFlightMessages(t *testing.T) {
 	processed := int64(0)
 
 	// Slow subscriber to create in-flight messages
-	subscriber := sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
+	subscriber := stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		time.Sleep(50 * time.Millisecond) // Simulate processing time
 		atomic.AddInt64(&processed, 1)
 		return nil
@@ -328,19 +328,20 @@ func TestIntegration_MicroserviceCommunication(t *testing.T) {
 	commandTopic := stream.Topic("microservice.commands.send.email")
 
 	emailsSent := make(chan string, 10)
-
 	// Email service subscribes to commands
-	emailService := sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
+	emailSub, err := s.Subscribe(commandTopic, stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		emailsSent <- string(msg.Data)
 		return nil
-	})
-
-	emailSub, err := s.Subscribe(commandTopic, emailService)
+	}))
 	require.NoError(t, err)
-	defer emailSub.Stop()
+	defer func() {
+		if err := emailSub.Stop(); err != nil {
+			t.Logf("Error stopping email subscription: %v", err)
+		}
+	}()
 
 	// Event processor subscribes to events and issues commands
-	eventProcessor := sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
+	eventSub, err := s.Subscribe(eventTopic, stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		// Process user creation event and send email command
 		command := stream.Message{
 			Topic: commandTopic,
@@ -351,11 +352,13 @@ func TestIntegration_MicroserviceCommunication(t *testing.T) {
 			Time: time.Now(),
 		}
 		return s.Publish(ctx, commandTopic, command)
-	})
-
-	eventSub, err := s.Subscribe(eventTopic, eventProcessor)
+	}))
 	require.NoError(t, err)
-	defer eventSub.Stop()
+	defer func() {
+		if err := eventSub.Stop(); err != nil {
+			t.Logf("Error stopping event subscription: %v", err)
+		}
+	}()
 
 	// Wait for subscriptions to establish
 	time.Sleep(200 * time.Millisecond)
@@ -364,17 +367,14 @@ func TestIntegration_MicroserviceCommunication(t *testing.T) {
 	defer cancel()
 
 	// Service A publishes user creation event
-	userEvent := stream.Message{
+	require.NoError(t, s.Publish(ctx, eventTopic, stream.Message{
 		Topic: eventTopic,
 		Data:  []byte("user123"),
 		Headers: map[string]string{
 			"Event-Type": "user-created",
 		},
 		Time: time.Now(),
-	}
-
-	err = s.Publish(ctx, eventTopic, userEvent)
-	require.NoError(t, err)
+	}))
 
 	// Verify email command was sent
 	select {
@@ -398,10 +398,10 @@ func TestIntegration_WorkQueuePattern(t *testing.T) {
 	workers := make([]stream.Subscription, numWorkers)
 
 	// Start workers (same queue group for load balancing)
-	for i := 0; i < numWorkers; i++ {
+	for i := range numWorkers {
 		workerID := fmt.Sprintf("worker-%d", i)
 
-		worker := sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
+		worker := stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 			jobID := string(msg.Data)
 			time.Sleep(10 * time.Millisecond) // Simulate work
 
@@ -415,7 +415,11 @@ func TestIntegration_WorkQueuePattern(t *testing.T) {
 		subscription, err := s.Subscribe(topic, worker, sub.WithQueueGroupName("work-queue"))
 		require.NoError(t, err)
 		workers[i] = subscription
-		defer subscription.Stop()
+		defer func() {
+			if err := subscription.Stop(); err != nil {
+				t.Logf("Error stopping worker subscription: %v", err)
+			}
+		}()
 	}
 
 	// Wait for subscriptions to establish
@@ -426,14 +430,12 @@ func TestIntegration_WorkQueuePattern(t *testing.T) {
 
 	// Submit jobs
 	numJobs := 30
-	for i := 0; i < numJobs; i++ {
-		job := stream.Message{
+	for i := range numJobs {
+		require.NoError(t, s.Publish(ctx, topic, stream.Message{
 			Topic: topic,
 			Data:  []byte(fmt.Sprintf("job-%d", i)),
 			Time:  time.Now(),
-		}
-		err := s.Publish(ctx, topic, job)
-		require.NoError(t, err)
+		}))
 	}
 
 	// Wait for all jobs to be processed
@@ -466,21 +468,21 @@ func TestIntegration_FanOutFanInPattern(t *testing.T) {
 	resultTopic := stream.Topic("integration.fanout.result")
 
 	// Fan-out: Input processor splits work
-	fanOut := sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
+	fanOut := stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		// Split input into multiple tasks
 		taskData := string(msg.Data)
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			task := stream.Message{
 				Topic: processingTopic,
-				Data:  []byte(fmt.Sprintf("%s-part-%d", taskData, i)),
+				Data:  fmt.Appendf(nil, "%s-part-%d", taskData, i),
 				Headers: map[string]string{
 					"Original-stream.Message": taskData,
 					"Part":                    fmt.Sprintf("%d", i),
 				},
 				Time: time.Now(),
 			}
-			err := s.Publish(ctx, processingTopic, task)
-			if err != nil {
+
+			if err := s.Publish(ctx, processingTopic, task); err != nil {
 				return err
 			}
 		}
@@ -489,38 +491,49 @@ func TestIntegration_FanOutFanInPattern(t *testing.T) {
 
 	fanOutSub, err := s.Subscribe(inputTopic, fanOut)
 	require.NoError(t, err)
-	defer fanOutSub.Stop()
+	defer func() {
+		if err := fanOutSub.Stop(); err != nil {
+			t.Logf("Error stopping fan-out subscription: %v", err)
+		}
+	}()
 
 	// Processors handle individual tasks
 	results := make(chan string, 20)
 
-	processor := sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
-		// Process task and send result
-		result := stream.Message{
-			Topic: resultTopic,
-			Data:  []byte("processed-" + string(msg.Data)),
-			Headers: map[string]string{
-				"Original-stream.Message": msg.Headers["Original-stream.Message"],
-				"Part":                    msg.Headers["Part"],
-			},
-			Time: time.Now(),
-		}
-		return s.Publish(ctx, resultTopic, result)
-	})
-
-	processorSub, err := s.Subscribe(processingTopic, processor, sub.WithConcurrency(3))
+	processorSub, err := s.Subscribe(
+		processingTopic,
+		stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
+			// Process task and send result
+			result := stream.Message{
+				Topic: resultTopic,
+				Data:  []byte("processed-" + string(msg.Data)),
+				Headers: map[string]string{
+					"Original-stream.Message": msg.Headers["Original-stream.Message"],
+					"Part":                    msg.Headers["Part"],
+				},
+				Time: time.Now(),
+			}
+			return s.Publish(ctx, resultTopic, result)
+		}),
+		sub.WithConcurrency(3))
 	require.NoError(t, err)
-	defer processorSub.Stop()
+	defer func() {
+		if err := processorSub.Stop(); err != nil {
+			t.Logf("Error stopping processor subscription: %v", err)
+		}
+	}()
 
 	// Fan-in: Result collector
-	collector := sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
+	collectorSub, err := s.Subscribe(resultTopic, stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		results <- string(msg.Data)
 		return nil
-	})
-
-	collectorSub, err := s.Subscribe(resultTopic, collector)
+	}))
 	require.NoError(t, err)
-	defer collectorSub.Stop()
+	defer func() {
+		if err := collectorSub.Stop(); err != nil {
+			t.Logf("Error stopping collector subscription: %v", err)
+		}
+	}()
 
 	// Wait for subscriptions to establish
 	time.Sleep(200 * time.Millisecond)
@@ -529,20 +542,17 @@ func TestIntegration_FanOutFanInPattern(t *testing.T) {
 	defer cancel()
 
 	// Send input message
-	input := stream.Message{
+	require.NoError(t, s.Publish(ctx, inputTopic, stream.Message{
 		Topic: inputTopic,
 		Data:  []byte("input-data-1"),
 		Time:  time.Now(),
-	}
-
-	err = s.Publish(ctx, inputTopic, input)
-	require.NoError(t, err)
+	}))
 
 	// Collect results (should receive 3 processed parts)
 	var collectedResults []string
 	timeout := time.After(5 * time.Second)
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		select {
 		case result := <-results:
 			collectedResults = append(collectedResults, result)
@@ -553,7 +563,7 @@ func TestIntegration_FanOutFanInPattern(t *testing.T) {
 
 	// Verify all parts were processed
 	assert.Len(t, collectedResults, 3)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		expected := fmt.Sprintf("processed-input-data-1-part-%d", i)
 		assert.Contains(t, collectedResults, expected)
 	}
@@ -573,32 +583,39 @@ func TestIntegration_PublisherSubscriberStreamCoordination(t *testing.T) {
 	group2Messages := make(chan stream.Message, 10)
 
 	// Group 1: High concurrency, block backpressure
-	group1Sub := sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
-		group1Messages <- msg
-		return nil
-	})
-
-	sub1, err := s.Subscribe(topic, group1Sub,
+	sub1, err := s.Subscribe(
+		topic,
+		stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
+			group1Messages <- msg
+			return nil
+		}),
 		sub.WithQueueGroupName("group1"),
 		sub.WithConcurrency(5),
 		sub.WithBackpressure(sub.BackpressureBlock))
 	require.NoError(t, err)
-	defer sub1.Stop()
+	defer func() {
+		if err := sub1.Stop(); err != nil {
+			t.Logf("Error stopping subscription 1: %v", err)
+		}
+	}()
 
 	// Group 2: Low concurrency, drop newest backpressure
-	group2Sub := sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
-		time.Sleep(100 * time.Millisecond) // Slower processing
-		group2Messages <- msg
-		return nil
-	})
-
-	sub2, err := s.Subscribe(topic, group2Sub,
+	sub2, err := s.Subscribe(topic,
+		stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
+			time.Sleep(100 * time.Millisecond) // Slower processing
+			group2Messages <- msg
+			return nil
+		}),
 		sub.WithQueueGroupName("group2"),
 		sub.WithConcurrency(1),
 		sub.WithBackpressure(sub.BackpressureDropNewest),
 		sub.WithBufferSize(5))
 	require.NoError(t, err)
-	defer sub2.Stop()
+	defer func() {
+		if err := sub2.Stop(); err != nil {
+			t.Logf("Error stopping subscription 2: %v", err)
+		}
+	}()
 
 	// Wait for subscriptions to establish
 	time.Sleep(200 * time.Millisecond)
@@ -608,10 +625,10 @@ func TestIntegration_PublisherSubscriberStreamCoordination(t *testing.T) {
 
 	// Publish messages rapidly
 	numMessages := 20
-	for i := 0; i < numMessages; i++ {
+	for i := range numMessages {
 		msg := stream.Message{
 			Topic: topic,
-			Data:  []byte(fmt.Sprintf("coordination message %d", i)),
+			Data:  fmt.Appendf(nil, "coordination message %d", i),
 			Headers: map[string]string{
 				"stream.Message-ID": fmt.Sprintf("msg-%d", i),
 			},
@@ -649,14 +666,16 @@ func TestIntegration_CodecMessageTransportIntegration(t *testing.T) {
 	received := make(chan TestData, 5)
 
 	// JSON subscriber
-	handler := func(ctx context.Context, data TestData) error {
+	sub, err := client.SubscribeJSON(s, topic, func(ctx context.Context, data TestData) error {
 		received <- data
 		return nil
-	}
-
-	sub, err := client.SubscribeJSON(s, topic, handler)
+	})
 	require.NoError(t, err)
-	defer sub.Stop()
+	defer func() {
+		if err := sub.Stop(); err != nil {
+			t.Logf("Error stopping subscription: %v", err)
+		}
+	}()
 
 	// Wait for subscription to establish
 	time.Sleep(100 * time.Millisecond)
@@ -680,7 +699,7 @@ func TestIntegration_CodecMessageTransportIntegration(t *testing.T) {
 	receivedData := make([]TestData, 0, len(testData))
 	timeout := time.After(5 * time.Second)
 
-	for i := 0; i < len(testData); i++ {
+	for i := range testData {
 		select {
 		case data := <-received:
 			receivedData = append(receivedData, data)
@@ -721,27 +740,31 @@ func TestIntegration_ErrorHandlingAcrossComponents(t *testing.T) {
 	successful := make(chan stream.Message, 10)
 
 	// Subscriber that fails on specific conditions
-	subscriber := sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
-		msgContent := string(msg.Data)
+	subscription, err := s.Subscribe(topic,
+		stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
+			msgContent := string(msg.Data)
 
-		// Simulate different error conditions
-		if msgContent == "panic-message" {
-			panic("simulated panic")
-		}
-		if msgContent == "error-message" {
-			err := fmt.Errorf("simulated processing error")
-			errors <- err
-			return err
-		}
+			// Simulate different error conditions
+			if msgContent == "panic-message" {
+				panic("simulated panic")
+			}
+			if msgContent == "error-message" {
+				err := fmt.Errorf("simulated processing error")
+				errors <- err
+				return err
+			}
 
-		// Successful processing
-		successful <- msg
-		return nil
-	})
-
-	subscription, err := s.Subscribe(topic, subscriber, sub.WithConcurrency(2))
+			// Successful processing
+			successful <- msg
+			return nil
+		}),
+		sub.WithConcurrency(2))
 	require.NoError(t, err)
-	defer subscription.Stop()
+	defer func() {
+		if err := subscription.Stop(); err != nil {
+			t.Logf("Error stopping subscription: %v", err)
+		}
+	}()
 
 	// Wait for subscription to establish
 	time.Sleep(100 * time.Millisecond)
@@ -750,25 +773,22 @@ func TestIntegration_ErrorHandlingAcrossComponents(t *testing.T) {
 	defer cancel()
 
 	// Send mix of successful and failing messages
-	messages := []string{
+	for i, msg := range []string{
 		"normal-message-1",
 		"error-message",
 		"normal-message-2",
 		"panic-message",
 		"normal-message-3",
-	}
-
-	for i, content := range messages {
+	} {
 		msg := stream.Message{
 			Topic: topic,
-			Data:  []byte(content),
+			Data:  []byte(msg),
 			Headers: map[string]string{
 				"stream.Message-ID": fmt.Sprintf("msg-%d", i),
 			},
 			Time: time.Now(),
 		}
-		err = s.Publish(ctx, topic, msg)
-		require.NoError(t, err)
+		require.NoError(t, s.Publish(ctx, topic, msg))
 	}
 
 	// Allow time for processing
@@ -789,14 +809,11 @@ func TestIntegration_ErrorHandlingAcrossComponents(t *testing.T) {
 	assert.Equal(t, 1, errorCount)
 
 	// Verify the system is still functional by sending another message
-	finalMsg := stream.Message{
+	require.NoError(t, s.Publish(ctx, topic, stream.Message{
 		Topic: topic,
 		Data:  []byte("final-test-message"),
 		Time:  time.Now(),
-	}
-
-	err = s.Publish(ctx, topic, finalMsg)
-	require.NoError(t, err)
+	}))
 
 	// Should receive the final message
 	select {
@@ -830,11 +847,11 @@ func TestIntegration_ConfigurationConsistencyAcrossComponents(t *testing.T) {
 	subscribers := make([]stream.Subscription, 3)
 	received := make([]chan stream.Message, 3)
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		received[i] = make(chan stream.Message, 5)
 		index := i // Capture for closure
 
-		subscriber := sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
+		subscriber := stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 			received[index] <- msg
 			return nil
 		})
@@ -942,7 +959,7 @@ func TestIntegration_MemoryUsageStability(t *testing.T) {
 
 	// Create subscriber that processes messages
 	processed := int64(0)
-	subscriber := sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
+	subscriber := stream.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		atomic.AddInt64(&processed, 1)
 		// Simulate some work
 		_ = string(msg.Data)
@@ -951,7 +968,11 @@ func TestIntegration_MemoryUsageStability(t *testing.T) {
 
 	sub, err := s.Subscribe(topic, subscriber, sub.WithConcurrency(3))
 	require.NoError(t, err)
-	defer sub.Stop()
+	defer func() {
+		if err := sub.Stop(); err != nil {
+			t.Logf("Error stopping subscription: %v", err)
+		}
+	}()
 
 	// Wait for subscription to establish
 	time.Sleep(100 * time.Millisecond)
@@ -963,11 +984,11 @@ func TestIntegration_MemoryUsageStability(t *testing.T) {
 	numRounds := 10
 	messagesPerRound := 100
 
-	for round := 0; round < numRounds; round++ {
-		for i := 0; i < messagesPerRound; i++ {
+	for round := range numRounds {
+		for i := range messagesPerRound {
 			msg := stream.Message{
 				Topic: topic,
-				Data:  []byte(fmt.Sprintf("round %d message %d with some data payload", round, i)),
+				Data:  fmt.Appendf(nil, "round %d message %d with some data payload", round, i),
 				Headers: map[string]string{
 					"Round":             fmt.Sprintf("%d", round),
 					"stream.Message-ID": fmt.Sprintf("r%d-m%d", round, i),
@@ -1009,7 +1030,6 @@ func TestIntegration_MemoryUsageStability(t *testing.T) {
 	t.Logf("Messages processed: %d", finalProcessed)
 
 	// Memory growth should be reasonable (less than 10MB for this test)
-	maxAcceptableGrowth := uint64(10 * 1024 * 1024) // 10MB
-	assert.Less(t, memGrowth, maxAcceptableGrowth,
+	assert.Less(t, memGrowth, uint64(10*1024*1024), // 10MB
 		"Memory growth should be reasonable")
 }
