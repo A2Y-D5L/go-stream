@@ -1,6 +1,7 @@
 package pub
 
 import (
+	"maps"
 	"context"
 	"time"
 
@@ -33,9 +34,7 @@ func WithHeaders(h map[string]string) Option {
 		if c.headers == nil {
 			c.headers = make(map[string]string, len(h))
 		}
-		for k, v := range h {
-			c.headers[k] = v
-		}
+		maps.Copy(c.headers, h)
 	}
 }
 

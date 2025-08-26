@@ -53,7 +53,7 @@ func (m *mockCodec) Encode(v any) ([]byte, error) {
 	if m.encoded != nil {
 		return m.encoded, nil
 	}
-	return []byte(fmt.Sprintf("%s-encoded-%v", m.name, v)), nil
+	return fmt.Appendf(nil, "%s-encoded-%v", m.name, v), nil
 }
 
 func (m *mockCodec) Decode(data []byte, v any) error {
@@ -363,8 +363,7 @@ func BenchmarkJSONCodec_EncodeSimpleStruct(b *testing.B) {
 	codec := &jsonCodec{}
 	user := CodecTestUser{ID: 123, Name: "John Doe", Email: "john@example.com"}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err := codec.Encode(user)
 		if err != nil {
 			b.Fatal(err)
@@ -377,8 +376,7 @@ func BenchmarkJSONCodec_DecodeSimpleStruct(b *testing.B) {
 	user := CodecTestUser{ID: 123, Name: "John Doe", Email: "john@example.com"}
 	data, _ := codec.Encode(user)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		var decoded CodecTestUser
 		err := codec.Decode(data, &decoded)
 		if err != nil {
@@ -404,8 +402,7 @@ func BenchmarkJSONCodec_EncodeComplexStruct(b *testing.B) {
 		OptionalID: func() *int { i := 999; return &i }(),
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err := codec.Encode(complex)
 		if err != nil {
 			b.Fatal(err)
@@ -431,8 +428,7 @@ func BenchmarkJSONCodec_DecodeComplexStruct(b *testing.B) {
 	}
 	data, _ := codec.Encode(complex)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		var decoded CodecTestComplexData
 		err := codec.Decode(data, &decoded)
 		if err != nil {

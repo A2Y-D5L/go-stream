@@ -79,14 +79,12 @@ func BenchmarkMultiError_AddConcurrent(b *testing.B) {
 	var wg sync.WaitGroup
 	numGoroutines := 100
 
-	for i := 0; i < numGoroutines; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range numGoroutines {
+		wg.Go(func() {
 			for j := 0; j < b.N/numGoroutines; j++ {
 				me.Add(err)
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -97,8 +95,7 @@ func BenchmarkMultiError_AddConcurrent(b *testing.B) {
 func BenchmarkBoundedQueue_Push(b *testing.B) {
 	q := NewBoundedQueue(1000, OverflowDropOldest)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := 0; b.Loop(); i++ {
 		q.Push(i)
 	}
 }
@@ -107,16 +104,15 @@ func BenchmarkBoundedQueue_Pop(b *testing.B) {
 	q := NewBoundedQueue(1000, OverflowReject)
 
 	// Pre-fill queue
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		q.Push(i)
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		q.Pop()
 		if q.Len() == 0 {
 			// Refill
-			for j := 0; j < 1000; j++ {
+			for j := range 1000 {
 				q.Push(j)
 			}
 		}
@@ -143,8 +139,7 @@ func BenchmarkBoundedQueue_PushPop(b *testing.B) {
 func BenchmarkPriorityQueue_Push(b *testing.B) {
 	pq := NewPriorityQueue()
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := 0; b.Loop(); i++ {
 		pq.Push(i, i%100)
 	}
 }
@@ -153,16 +148,15 @@ func BenchmarkPriorityQueue_Pop(b *testing.B) {
 	pq := NewPriorityQueue()
 
 	// Pre-fill queue
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		pq.Push(i, i%100)
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		pq.Pop()
 		if pq.Len() == 0 {
 			// Refill
-			for j := 0; j < 1000; j++ {
+			for j := range 1000 {
 				pq.Push(j, j%100)
 			}
 		}
@@ -245,8 +239,7 @@ func BenchmarkSemaphore_AcquireRelease(b *testing.B) {
 func BenchmarkTimeoutMutex_LockUnlock(b *testing.B) {
 	tm := NewTimeoutMutex()
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		tm.Lock()
 		tm.Unlock()
 	}
@@ -271,8 +264,7 @@ func BenchmarkMergeContexts_Two(b *testing.B) {
 	ctx1 := context.Background()
 	ctx2 := context.Background()
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		merged, cancel := MergeContexts(ctx1, ctx2)
 		cancel()
 		_ = merged
@@ -285,8 +277,7 @@ func BenchmarkMergeContexts_Five(b *testing.B) {
 		ctxs[i] = context.Background()
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		merged, cancel := MergeContexts(ctxs...)
 		cancel()
 		_ = merged
@@ -298,8 +289,7 @@ func BenchmarkMergeContexts_Five(b *testing.B) {
 func BenchmarkStdMutex_LockUnlock(b *testing.B) {
 	var mu sync.Mutex
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		mu.Lock()
 		mu.Unlock()
 	}

@@ -388,8 +388,7 @@ func BenchmarkMessage_Creation(b *testing.B) {
 	}
 	data := []byte(`{"id": 123, "name": "test"}`)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = Message{
 			Topic:   "benchmark.topic",
 			Data:    data,
@@ -412,8 +411,7 @@ func BenchmarkMessage_JSONMarshal(b *testing.B) {
 		Time: time.Now(),
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err := json.Marshal(msg)
 		if err != nil {
 			b.Fatal(err)
@@ -434,8 +432,7 @@ func BenchmarkMessage_JSONUnmarshal(b *testing.B) {
 	}
 	data, _ := json.Marshal(msg)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		var restored Message
 		err := json.Unmarshal(data, &restored)
 		if err != nil {
@@ -452,8 +449,7 @@ func BenchmarkMessage_HeaderOperations(b *testing.B) {
 		Time:    time.Now(),
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		msg.Headers["Key"] = "Value"
 		_ = msg.Headers["Key"]
 		delete(msg.Headers, "Key")

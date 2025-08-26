@@ -51,7 +51,7 @@ func WithTimeoutFallback(parent context.Context, timeout time.Duration, fallback
 }
 
 // WithValue creates a context with multiple key-value pairs
-func WithValues(parent context.Context, keyValues ...interface{}) context.Context {
+func WithValues(parent context.Context, keyValues ...any) context.Context {
 	if len(keyValues)%2 != 0 {
 		panic("keyValues must contain an even number of elements")
 	}

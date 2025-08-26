@@ -1,6 +1,7 @@
 package observability
 
 import (
+	"maps"
 	"context"
 	"sync"
 	"time"
@@ -235,9 +236,7 @@ func copyLabels(labels map[string]string) map[string]string {
 	}
 
 	copy := make(map[string]string, len(labels))
-	for k, v := range labels {
-		copy[k] = v
-	}
+	maps.Copy(copy, labels)
 	return copy
 }
 

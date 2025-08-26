@@ -1,6 +1,7 @@
 package message
 
 import (
+	"maps"
 	"testing"
 	"time"
 
@@ -302,9 +303,7 @@ func TestHeaders_ContextIntegration(t *testing.T) {
 
 		// Simulate passing through system - request ID should be preserved
 		processedHeaders := make(map[string]string)
-		for k, v := range originalHeaders {
-			processedHeaders[k] = v
-		}
+		maps.Copy(processedHeaders, originalHeaders)
 
 		// Add additional context
 		processedHeaders["X-Processed-By"] = "service-A"
@@ -435,8 +434,7 @@ func TestHeaders_EdgeCases(t *testing.T) {
 func BenchmarkHeaders_SetSingle(b *testing.B) {
 	headers := make(map[string]string)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		headers["Content-Type"] = "application/json"
 	}
 }
@@ -446,15 +444,14 @@ func BenchmarkHeaders_GetSingle(b *testing.B) {
 		"Content-Type": "application/json",
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = headers["Content-Type"]
 	}
 }
 
 func BenchmarkHeaders_SetMultiple(b *testing.B) {
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		headers := map[string]string{
 			"Content-Type":  "application/json",
 			"X-Request-Id":  "req-123",
@@ -475,18 +472,15 @@ func BenchmarkHeaders_CopyHeaders(b *testing.B) {
 		"X-User-Agent":  "go-stream/1.0",
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		destHeaders := make(map[string]string)
-		for k, v := range sourceHeaders {
-			destHeaders[k] = v
-		}
+		maps.Copy(destHeaders, sourceHeaders)
 	}
 }
 
 func BenchmarkHeaders_DeleteHeader(b *testing.B) {
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		headers := map[string]string{
 			"Content-Type":  "application/json",
 			"X-Request-Id":  "req-123",
@@ -508,8 +502,7 @@ func BenchmarkHeaders_IterateHeaders(b *testing.B) {
 		"X-Client":      "test-client",
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		for k, v := range headers {
 			_ = k
 			_ = v

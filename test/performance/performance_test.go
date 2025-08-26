@@ -66,7 +66,7 @@ func TestPerformance_EndToEndThroughput(t *testing.T) {
 	publishEnd = time.Now()
 
 	// Wait for all messages to be received
-	for i := int64(0); i < messageCount; i++ {
+	for i := range messageCount {
 		select {
 		case <-received:
 			// stream.Message received
@@ -120,10 +120,10 @@ func TestPerformance_MemoryUsage(t *testing.T) {
 
 	// Publish messages and measure memory usage
 	messageCount := 50000
-	for i := 0; i < messageCount; i++ {
+	for i := range messageCount {
 		msg := stream.Message{
 			Topic: top,
-			Data:  []byte(fmt.Sprintf("memory-test-message-%d-with-some-content-to-make-it-larger", i)),
+			Data:  fmt.Appendf(nil, "memory-test-message-%d-with-some-content-to-make-it-larger", i),
 			Headers: map[string]string{
 				"Content-Type":      "text/plain",
 				"stream.Message-ID": fmt.Sprintf("mem-%d", i),
@@ -200,11 +200,11 @@ func TestPerformance_Latency(t *testing.T) {
 
 	// Publish messages with timing information
 	messageCount := 1000
-	for i := 0; i < messageCount; i++ {
+	for i := range messageCount {
 		sendTime := time.Now()
 		msg := stream.Message{
 			Topic: topic,
-			Data:  []byte(fmt.Sprintf("latency-test-%d", i)),
+			Data:  fmt.Appendf(nil, "latency-test-%d", i),
 			Headers: map[string]string{
 				"Send-Time":         sendTime.Format(time.RFC3339Nano),
 				"stream.Message-ID": fmt.Sprintf("lat-%d", i),

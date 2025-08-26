@@ -50,7 +50,7 @@ func TestConcurrency_100ConcurrentPublishers(t *testing.T) {
 	publishedCount := int64(0)
 
 	// Start concurrent publishers
-	for i := 0; i < numPublishers; i++ {
+	for i := range numPublishers {
 		wg.Add(1)
 		go func(publisherID int) {
 			defer wg.Done()
@@ -58,10 +58,10 @@ func TestConcurrency_100ConcurrentPublishers(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 
-			for j := 0; j < messagesPerPublisher; j++ {
+			for j := range messagesPerPublisher {
 				msg := stream.Message{
 					Topic: topic,
-					Data:  []byte(fmt.Sprintf("publisher-%d-message-%d", publisherID, j)),
+					Data:  fmt.Appendf(nil, "publisher-%d-message-%d", publisherID, j),
 					Headers: map[string]string{
 						"Publisher-ID":       fmt.Sprintf("%d", publisherID),
 						"stream.Message-Seq": fmt.Sprintf("%d", j),
@@ -116,7 +116,7 @@ func TestConcurrency_100ConcurrentSubscribers(t *testing.T) {
 	subscribers := make([]stream.Subscription, numSubscribers)
 
 	// Create subscribers with different queue groups (each gets all messages)
-	for i := 0; i < numSubscribers; i++ {
+	for i := range numSubscribers {
 		index := i // Capture for closure
 
 		subscriber := sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
@@ -142,10 +142,10 @@ func TestConcurrency_100ConcurrentSubscribers(t *testing.T) {
 	defer cancel()
 
 	// Publish messages
-	for i := 0; i < numMessages; i++ {
+	for i := range numMessages {
 		msg := stream.Message{
 			Topic: topic,
-			Data:  []byte(fmt.Sprintf("broadcast message %d", i)),
+			Data:  fmt.Appendf(nil, "broadcast message %d", i),
 			Headers: map[string]string{
 				"stream.Message-ID": fmt.Sprintf("msg-%d", i),
 			},
@@ -164,7 +164,7 @@ func TestConcurrency_100ConcurrentSubscribers(t *testing.T) {
 	time.Sleep(10 * time.Second)
 
 	// Verify each subscriber received all messages
-	for i := 0; i < numSubscribers; i++ {
+	for i := range numSubscribers {
 		count := atomic.LoadInt64(&subscriberCounts[i])
 		assert.GreaterOrEqual(t, count, int64(float64(numMessages)*0.95),
 			"Subscriber %d should receive at least 95%% of messages, got %d", i, count)
@@ -172,7 +172,7 @@ func TestConcurrency_100ConcurrentSubscribers(t *testing.T) {
 
 	// Calculate total processed messages
 	totalProcessed := int64(0)
-	for i := 0; i < numSubscribers; i++ {
+	for i := range numSubscribers {
 		totalProcessed += atomic.LoadInt64(&subscriberCounts[i])
 	}
 
@@ -246,13 +246,11 @@ func TestConcurrency_MixedConcurrentOperations(t *testing.T) {
 	defer cancel()
 
 	// Concurrent pub/sub operations
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for i := 0; i < 500; i++ {
+	wg.Go(func() {
+		for i := range 500 {
 			msg := stream.Message{
 				Topic: pubsubTopic,
-				Data:  []byte(fmt.Sprintf("pubsub-msg-%d", i)),
+				Data:  fmt.Appendf(nil, "pubsub-msg-%d", i),
 				Time:  time.Now(),
 			}
 			err := s.Publish(ctx, pubsubTopic, msg)
@@ -260,16 +258,14 @@ func TestConcurrency_MixedConcurrentOperations(t *testing.T) {
 				t.Errorf("Failed to publish pubsub message %d: %v", i, err)
 			}
 		}
-	}()
+	})
 
 	// Concurrent request/reply operations
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for i := 0; i < 200; i++ {
+	wg.Go(func() {
+		for i := range 200 {
 			request := stream.Message{
 				Topic: requestTopic,
-				Data:  []byte(fmt.Sprintf("request-%d", i)),
+				Data:  fmt.Appendf(nil, "request-%d", i),
 				Headers: map[string]string{
 					"Request-ID": fmt.Sprintf("req-%d", i),
 				},
@@ -286,13 +282,11 @@ func TestConcurrency_MixedConcurrentOperations(t *testing.T) {
 				}
 			}
 		}
-	}()
+	})
 
 	// Mixed subscription operations
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for i := 0; i < 5; i++ {
+	wg.Go(func() {
+		for i := range 5 {
 			// Create temporary subscribers
 			tempTopic := stream.Topic(fmt.Sprintf("concurrency.temp.%d", i))
 			tempReceived := int64(0)
@@ -309,10 +303,10 @@ func TestConcurrency_MixedConcurrentOperations(t *testing.T) {
 			}
 
 			// Send messages to temp topic
-			for j := 0; j < 10; j++ {
+			for j := range 10 {
 				msg := stream.Message{
 					Topic: tempTopic,
-					Data:  []byte(fmt.Sprintf("temp-msg-%d-%d", i, j)),
+					Data:  fmt.Appendf(nil, "temp-msg-%d-%d", i, j),
 					Time:  time.Now(),
 				}
 				_ = s.Publish(ctx, tempTopic, msg)
@@ -328,7 +322,7 @@ func TestConcurrency_MixedConcurrentOperations(t *testing.T) {
 				t.Errorf("Temp subscriber %d received %d messages, expected at least 8", i, tempReceived)
 			}
 		}
-	}()
+	})
 
 	wg.Wait()
 
@@ -358,7 +352,7 @@ func TestConcurrency_LoadBalancingAcrossSubscribers(t *testing.T) {
 	subscriberCounts := make([]int64, numSubscribers)
 
 	// Create subscribers in the same queue group for load balancing
-	for i := 0; i < numSubscribers; i++ {
+	for i := range numSubscribers {
 		index := i // Capture for closure
 
 		subscriber := sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
@@ -382,10 +376,10 @@ func TestConcurrency_LoadBalancingAcrossSubscribers(t *testing.T) {
 
 	// Publish messages
 	numMessages := 500
-	for i := 0; i < numMessages; i++ {
+	for i := range numMessages {
 		msg := stream.Message{
 			Topic: topic,
-			Data:  []byte(fmt.Sprintf("load-balance-msg-%d", i)),
+			Data:  fmt.Appendf(nil, "load-balance-msg-%d", i),
 			Headers: map[string]string{
 				"stream.Message-ID": fmt.Sprintf("lb-%d", i),
 			},
@@ -400,7 +394,7 @@ func TestConcurrency_LoadBalancingAcrossSubscribers(t *testing.T) {
 
 	// Verify load balancing
 	totalProcessed := int64(0)
-	for i := 0; i < numSubscribers; i++ {
+	for i := range numSubscribers {
 		count := atomic.LoadInt64(&subscriberCounts[i])
 		totalProcessed += count
 		t.Logf("Subscriber %d processed %d messages", i, count)
@@ -410,7 +404,7 @@ func TestConcurrency_LoadBalancingAcrossSubscribers(t *testing.T) {
 	assert.Equal(t, int64(numMessages), totalProcessed, "All messages should be processed")
 
 	// Check load distribution (each subscriber should get some messages)
-	for i := 0; i < numSubscribers; i++ {
+	for i := range numSubscribers {
 		count := atomic.LoadInt64(&subscriberCounts[i])
 		assert.Greater(t, count, int64(0), "Subscriber %d should process at least one message", i)
 
@@ -471,10 +465,10 @@ func TestConcurrency_ResourceSharingUnderHighLoad(t *testing.T) {
 		go func(topicIndex int, topicObj stream.Topic) {
 			defer wg.Done()
 
-			for j := 0; j < messagesPerTopic; j++ {
+			for j := range messagesPerTopic {
 				msg := stream.Message{
 					Topic: topicObj,
-					Data:  []byte(fmt.Sprintf("topic%d-msg-%d", topicIndex, j)),
+					Data:  fmt.Appendf(nil, "topic%d-msg-%d", topicIndex, j),
 					Headers: map[string]string{
 						"Topic-Index":       fmt.Sprintf("%d", topicIndex),
 						"stream.Message-ID": fmt.Sprintf("t%d-m%d", topicIndex, j),
@@ -574,10 +568,8 @@ func TestStress_SustainedLoad(t *testing.T) {
 	messageID := int64(0)
 
 	var wg sync.WaitGroup
-	wg.Add(1)
 
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		ticker := time.NewTicker(10 * time.Millisecond) // 100 messages per second
 		defer ticker.Stop()
 
@@ -597,7 +589,7 @@ func TestStress_SustainedLoad(t *testing.T) {
 				if id%10 == 0 {
 					data = []byte("heavy-task")
 				} else {
-					data = []byte(fmt.Sprintf("light-task-%d", id))
+					data = fmt.Appendf(nil, "light-task-%d", id)
 				}
 
 				msg := stream.Message{
@@ -616,7 +608,7 @@ func TestStress_SustainedLoad(t *testing.T) {
 				}
 			}
 		}
-	}()
+	})
 
 	// Monitor progress every 10 seconds
 	go func() {
@@ -700,11 +692,11 @@ func TestStress_MemoryUsageStabilityOverTime(t *testing.T) {
 	cycles := 5
 	messagesPerCycle := 1000
 
-	for cycle := 0; cycle < cycles; cycle++ {
+	for cycle := range cycles {
 		t.Logf("Starting cycle %d/%d", cycle+1, cycles)
 
 		// Publish messages
-		for i := 0; i < messagesPerCycle; i++ {
+		for i := range messagesPerCycle {
 			msg := stream.Message{
 				Topic: topic,
 				Data:  make([]byte, 2048), // 2KB message
@@ -783,13 +775,13 @@ func TestStress_ConnectionStabilityUnderStress(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
-	for cycle := 0; cycle < numCycles; cycle++ {
+	for cycle := range numCycles {
 		t.Logf("Connection stress cycle %d/%d", cycle+1, numCycles)
 
 		var wg sync.WaitGroup
 
 		// Create subscribers for this cycle
-		for i := 0; i < subscribersPerCycle; i++ {
+		for i := range subscribersPerCycle {
 			wg.Add(1)
 			go func(subID int) {
 				defer wg.Done()
@@ -813,10 +805,10 @@ func TestStress_ConnectionStabilityUnderStress(t *testing.T) {
 				time.Sleep(50 * time.Millisecond)
 
 				// Publish messages for this subscriber
-				for j := 0; j < messagesPerSubscriber; j++ {
+				for j := range messagesPerSubscriber {
 					msg := stream.Message{
 						Topic: topic,
-						Data:  []byte(fmt.Sprintf("cycle-%d-sub-%d-msg-%d", cycle, subID, j)),
+						Data:  fmt.Appendf(nil, "cycle-%d-sub-%d-msg-%d", cycle, subID, j),
 						Headers: map[string]string{
 							"Cycle":              fmt.Sprintf("%d", cycle),
 							"Subscriber":         fmt.Sprintf("%d", subID),

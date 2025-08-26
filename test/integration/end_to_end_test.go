@@ -89,7 +89,7 @@ func TestIntegration_CompletePublishSubscribeFlow(t *testing.T) {
 	receivedMessages := make([]stream.Message, 0, len(testMessages))
 	timeout := time.After(5 * time.Second)
 
-	for i := 0; i < len(testMessages); i++ {
+	for i := range testMessages {
 		select {
 		case msg := <-received:
 			receivedMessages = append(receivedMessages, msg)
@@ -236,10 +236,10 @@ func TestIntegration_StreamLifecycleWithActiveSubscriptions(t *testing.T) {
 	defer cancel()
 
 	// Publish some messages
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		msg := stream.Message{
 			Topic: topic,
-			Data:  []byte(fmt.Sprintf("lifecycle message %d", i)),
+			Data:  fmt.Appendf(nil, "lifecycle message %d", i),
 			Time:  time.Now(),
 		}
 		err = s.Publish(ctx, topic, msg)
@@ -290,10 +290,10 @@ func TestIntegration_GracefulShutdownWithInFlightMessages(t *testing.T) {
 
 	// Publish messages quickly to create backlog
 	numMessages := 10
-	for i := 0; i < numMessages; i++ {
+	for i := range numMessages {
 		msg := stream.Message{
 			Topic: topic,
-			Data:  []byte(fmt.Sprintf("shutdown message %d", i)),
+			Data:  fmt.Appendf(nil, "shutdown message %d", i),
 			Time:  time.Now(),
 		}
 		err = s.Publish(ctx, topic, msg)
@@ -433,7 +433,7 @@ func TestIntegration_WorkQueuePattern(t *testing.T) {
 	for i := range numJobs {
 		require.NoError(t, s.Publish(ctx, topic, stream.Message{
 			Topic: topic,
-			Data:  []byte(fmt.Sprintf("job-%d", i)),
+			Data:  fmt.Appendf(nil, "job-%d", i),
 			Time:  time.Now(),
 		}))
 	}
@@ -904,7 +904,7 @@ func TestIntegration_ConfigurationConsistencyAcrossComponents(t *testing.T) {
 	for i, opts := range publishOptions {
 		require.NoError(t, s.Publish(ctx, topic, stream.Message{
 			Topic:   topic,
-			Data:    []byte(fmt.Sprintf("config test message %d", i)),
+			Data:    fmt.Appendf(nil, "config test message %d", i),
 			Headers: map[string]string{"Test-Round": fmt.Sprintf("%d", i)},
 			Time:    time.Now(),
 		}, opts...))
@@ -920,7 +920,7 @@ func TestIntegration_ConfigurationConsistencyAcrossComponents(t *testing.T) {
 			"Subscriber group %d should receive all messages", i)
 
 		// Verify configuration consistency by checking message delivery
-		for j := 0; j < count; j++ {
+		for j := range count {
 			select {
 			case msg := <-received[i]:
 				assert.Equal(t, fmt.Sprintf("%d", j), msg.Headers["Test-Round"])

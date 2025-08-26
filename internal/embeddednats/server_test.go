@@ -265,7 +265,7 @@ func TestServer_Ready(t *testing.T) {
 		server.Start()
 
 		// Multiple readiness checks should all succeed
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			err := server.Ready(ctx)
 			cancel()
@@ -486,7 +486,7 @@ func TestServer_Concurrency(t *testing.T) {
 		// Multiple goroutines checking readiness
 		done := make(chan error, 5)
 
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			go func() {
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
@@ -495,7 +495,7 @@ func TestServer_Concurrency(t *testing.T) {
 		}
 
 		// All should succeed
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			err := <-done
 			assert.NoError(t, err, "Concurrent readiness check %d should succeed", i+1)
 		}
@@ -512,7 +512,7 @@ func TestServer_Concurrency(t *testing.T) {
 		// Multiple goroutines connecting
 		done := make(chan error, 10)
 
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			go func() {
 				nc, err := nats.Connect(server.ClientURL(), nats.Timeout(2*time.Second))
 				if err != nil {
@@ -528,7 +528,7 @@ func TestServer_Concurrency(t *testing.T) {
 		}
 
 		// All should succeed
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			err := <-done
 			assert.NoError(t, err, "Concurrent connection %d should succeed", i+1)
 		}
@@ -544,7 +544,7 @@ func TestServer_Concurrency(t *testing.T) {
 		// Multiple goroutines attempting shutdown
 		done := make(chan error, 3)
 
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			go func() {
 				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 				defer cancel()
@@ -559,7 +559,7 @@ func TestServer_Concurrency(t *testing.T) {
 		// Collect all results
 		var successCount int
 		var errors []error
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			err := <-done
 			if err == nil {
 				successCount++

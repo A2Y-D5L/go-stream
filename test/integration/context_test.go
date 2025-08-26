@@ -408,8 +408,8 @@ func headersToContext(ctx context.Context, headers map[string]string) context.Co
 func BenchmarkContext_WithValue(b *testing.B) {
 	ctx := context.Background()
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	
+	for b.Loop() {
 		ctx = context.WithValue(ctx, requestIDKey, "req-123")
 	}
 }

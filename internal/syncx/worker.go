@@ -75,9 +75,9 @@ func (wp *WorkerPool) Start() error {
 		return ErrWorkerPoolAlreadyStarted
 	}
 
-	for i := 0; i < wp.workers; i++ {
-		wp.wg.Add(1)
-		go wp.worker(i)
+	for range wp.workers {
+		
+		go wp.worker()
 	}
 
 	return nil
@@ -177,7 +177,8 @@ func (wp *WorkerPool) IsStopped() bool {
 }
 
 // worker is the main worker loop
-func (wp *WorkerPool) worker(id int) {
+func (wp *WorkerPool) worker() {
+	wp.wg.Add(1)
 	defer wp.wg.Done()
 
 	if wp.metrics != nil {

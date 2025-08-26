@@ -209,7 +209,7 @@ func TestErrorConcurrency(t *testing.T) {
 		errChan := make(chan error, numGoroutines)
 
 		// Add errors concurrently
-		for i := 0; i < numGoroutines; i++ {
+		for i := range numGoroutines {
 			go func(id int) {
 				err := errors.New("concurrent error")
 				merr.add(err)
@@ -218,7 +218,7 @@ func TestErrorConcurrency(t *testing.T) {
 		}
 
 		// Wait for all goroutines to complete
-		for i := 0; i < numGoroutines; i++ {
+		for range numGoroutines {
 			<-errChan
 		}
 

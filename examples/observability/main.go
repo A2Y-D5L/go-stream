@@ -287,7 +287,7 @@ func (pp *PaymentProcessor) Handle(ctx context.Context, msg stream.Message) erro
 		)
 
 		// Trigger order completion
-		completionData, _ := json.Marshal(map[string]interface{}{
+		completionData, _ := json.Marshal(map[string]any{
 			"order_id":   payment.OrderID,
 			"request_id": payment.RequestID,
 			"status":     "completed",
@@ -317,7 +317,7 @@ type NotificationService struct {
 func (ns *NotificationService) Handle(ctx context.Context, msg stream.Message) error {
 	startTime := time.Now()
 
-	var completion map[string]interface{}
+	var completion map[string]any
 	if err := json.Unmarshal(msg.Data, &completion); err != nil {
 		ns.logger.LogMessageProcessed(ctx, "orders.completed", "", time.Since(startTime), err)
 		return err

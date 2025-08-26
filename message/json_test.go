@@ -344,7 +344,7 @@ func TestJSON_ArrayEdgeCases(t *testing.T) {
 
 		// Navigate through the nested structure
 		current := decoded
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			arr, ok := current.([]any)
 			require.True(t, ok)
 			require.Len(t, arr, 1)
@@ -410,7 +410,7 @@ func TestJSON_ObjectEdgeCases(t *testing.T) {
 	t.Run("deeply nested object", func(t *testing.T) {
 		// Create deeply nested object
 		deeply := map[string]any{"value": "deep"}
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			deeply = map[string]any{"nested": deeply}
 		}
 
@@ -423,7 +423,7 @@ func TestJSON_ObjectEdgeCases(t *testing.T) {
 
 		// Navigate through nested structure
 		current := decoded
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			nested, ok := current["nested"]
 			require.True(t, ok)
 			current = nested.(map[string]any)
@@ -471,7 +471,7 @@ func TestJSON_ObjectEdgeCases(t *testing.T) {
 	t.Run("very large object", func(t *testing.T) {
 		// Create object with many keys
 		largeObject := make(map[string]int)
-		for i := 0; i < 1000; i++ {
+		for i := range 1000 {
 			largeObject["key_"+strconv.Itoa(i)] = i
 		}
 
@@ -531,7 +531,7 @@ func TestJSON_PerformanceEdgeCases(t *testing.T) {
 		// Create structure with 1000 levels of nesting
 		const depth = 1000
 		deeply := map[string]any{"value": "deep"}
-		for i := 0; i < depth; i++ {
+		for range depth {
 			deeply = map[string]any{"nested": deeply}
 		}
 
@@ -548,7 +548,7 @@ func TestJSON_PerformanceEdgeCases(t *testing.T) {
 
 		// Verify structure is correct
 		current := decoded
-		for i := 0; i < depth; i++ {
+		for range depth {
 			current = current["nested"].(map[string]any)
 		}
 		assert.Equal(t, "deep", current["value"])
@@ -560,7 +560,7 @@ func TestJSON_PerformanceEdgeCases(t *testing.T) {
 		// Create object with 10,000 keys
 		const width = 10000
 		wideObject := make(map[string]int, width)
-		for i := 0; i < width; i++ {
+		for i := range width {
 			wideObject["key_"+strconv.Itoa(i)] = i
 		}
 
@@ -665,8 +665,7 @@ func BenchmarkJSON_EncodeSimple(b *testing.B) {
 		"boolean": true,
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err := json.Marshal(data)
 		if err != nil {
 			b.Fatal(err)
@@ -677,8 +676,7 @@ func BenchmarkJSON_EncodeSimple(b *testing.B) {
 func BenchmarkJSON_DecodeSimple(b *testing.B) {
 	jsonData := []byte(`{"string":"test","number":123.456,"boolean":true}`)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		var result map[string]any
 		err := json.Unmarshal(jsonData, &result)
 		if err != nil {
@@ -696,8 +694,7 @@ func BenchmarkJSON_EncodeComplex(b *testing.B) {
 		"null":   nil,
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err := json.Marshal(complex)
 		if err != nil {
 			b.Fatal(err)
@@ -708,8 +705,7 @@ func BenchmarkJSON_EncodeComplex(b *testing.B) {
 func BenchmarkJSON_DecodeComplex(b *testing.B) {
 	jsonData := []byte(`{"array":[1,2,3,"four",true],"object":{"nested":"value"},"number":123.456,"string":"test string with unicode 🚀","null":null}`)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		var result map[string]any
 		err := json.Unmarshal(jsonData, &result)
 		if err != nil {
@@ -724,8 +720,7 @@ func BenchmarkJSON_LargeArray(b *testing.B) {
 		largeArray[i] = i
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err := json.Marshal(largeArray)
 		if err != nil {
 			b.Fatal(err)
@@ -735,12 +730,11 @@ func BenchmarkJSON_LargeArray(b *testing.B) {
 
 func BenchmarkJSON_LargeObject(b *testing.B) {
 	largeObject := make(map[string]int, 1000)
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		largeObject["key_"+strconv.Itoa(i)] = i
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err := json.Marshal(largeObject)
 		if err != nil {
 			b.Fatal(err)

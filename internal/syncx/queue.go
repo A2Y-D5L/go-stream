@@ -8,10 +8,10 @@ import (
 
 // Queue defines a generic queue interface
 type Queue interface {
-	Push(item interface{}) error
-	Pop() (interface{}, bool)
+	Push(item any) error
+	Pop() (any, bool)
 	Len() int
-	Drain() []interface{}
+	Drain() []any
 	Close()
 }
 
@@ -27,7 +27,7 @@ const (
 
 // BoundedQueue implements a thread-safe bounded queue with overflow policies
 type BoundedQueue struct {
-	items    []interface{}
+	items    []any
 	capacity int
 	mu       sync.Mutex
 	notEmpty *sync.Cond
@@ -42,7 +42,7 @@ func NewBoundedQueue(capacity int, policy OverflowPolicy) *BoundedQueue {
 	}
 
 	bq := &BoundedQueue{
-		items:    make([]interface{}, 0, capacity),
+		items:    make([]any, 0, capacity),
 		capacity: capacity,
 		policy:   policy,
 	}
@@ -51,7 +51,7 @@ func NewBoundedQueue(capacity int, policy OverflowPolicy) *BoundedQueue {
 }
 
 // Push adds an item to the queue according to the overflow policy
-func (bq *BoundedQueue) Push(item interface{}) error {
+func (bq *BoundedQueue) Push(item any) error {
 	bq.mu.Lock()
 	defer bq.mu.Unlock()
 
@@ -90,7 +90,7 @@ func (bq *BoundedQueue) Push(item interface{}) error {
 }
 
 // Pop removes and returns an item from the queue
-func (bq *BoundedQueue) Pop() (interface{}, bool) {
+func (bq *BoundedQueue) Pop() (any, bool) {
 	bq.mu.Lock()
 	defer bq.mu.Unlock()
 
@@ -104,7 +104,7 @@ func (bq *BoundedQueue) Pop() (interface{}, bool) {
 }
 
 // PopBlocking removes and returns an item from the queue, blocking until available
-func (bq *BoundedQueue) PopBlocking() (interface{}, bool) {
+func (bq *BoundedQueue) PopBlocking() (any, bool) {
 	bq.mu.Lock()
 	defer bq.mu.Unlock()
 
@@ -122,7 +122,7 @@ func (bq *BoundedQueue) PopBlocking() (interface{}, bool) {
 }
 
 // PopWithTimeout removes and returns an item with a timeout
-func (bq *BoundedQueue) PopWithTimeout(timeout time.Duration) (interface{}, bool) {
+func (bq *BoundedQueue) PopWithTimeout(timeout time.Duration) (any, bool) {
 	bq.mu.Lock()
 	defer bq.mu.Unlock()
 
@@ -171,11 +171,11 @@ func (bq *BoundedQueue) Len() int {
 }
 
 // Drain removes and returns all items from the queue
-func (bq *BoundedQueue) Drain() []interface{} {
+func (bq *BoundedQueue) Drain() []any {
 	bq.mu.Lock()
 	defer bq.mu.Unlock()
 
-	items := make([]interface{}, len(bq.items))
+	items := make([]any, len(bq.items))
 	copy(items, bq.items)
 	bq.items = bq.items[:0]
 	return items
@@ -211,7 +211,7 @@ type PriorityQueue struct {
 
 // PriorityItem represents an item in the priority queue
 type PriorityItem struct {
-	Value    interface{}
+	Value    any
 	Priority int
 	Index    int
 }
@@ -230,14 +230,14 @@ func (pq priorityHeap) Swap(i, j int) {
 	pq[j].Index = j
 }
 
-func (pq *priorityHeap) Push(x interface{}) {
+func (pq *priorityHeap) Push(x any) {
 	n := len(*pq)
 	item := x.(*PriorityItem)
 	item.Index = n
 	*pq = append(*pq, item)
 }
 
-func (pq *priorityHeap) Pop() interface{} {
+func (pq *priorityHeap) Pop() any {
 	old := *pq
 	n := len(old)
 	item := old[n-1]
@@ -255,7 +255,7 @@ func NewPriorityQueue() *PriorityQueue {
 }
 
 // Push adds an item with the specified priority
-func (pq *PriorityQueue) Push(value interface{}, priority int) error {
+func (pq *PriorityQueue) Push(value any, priority int) error {
 	pq.mu.Lock()
 	defer pq.mu.Unlock()
 
@@ -273,7 +273,7 @@ func (pq *PriorityQueue) Push(value interface{}, priority int) error {
 }
 
 // Pop removes and returns the highest priority item
-func (pq *PriorityQueue) Pop() (interface{}, bool) {
+func (pq *PriorityQueue) Pop() (any, bool) {
 	pq.mu.Lock()
 	defer pq.mu.Unlock()
 
@@ -293,7 +293,7 @@ func (pq *PriorityQueue) Len() int {
 }
 
 // Peek returns the highest priority item without removing it
-func (pq *PriorityQueue) Peek() (interface{}, int, bool) {
+func (pq *PriorityQueue) Peek() (any, int, bool) {
 	pq.mu.Lock()
 	defer pq.mu.Unlock()
 
@@ -306,11 +306,11 @@ func (pq *PriorityQueue) Peek() (interface{}, int, bool) {
 }
 
 // Drain removes and returns all items from the priority queue
-func (pq *PriorityQueue) Drain() []interface{} {
+func (pq *PriorityQueue) Drain() []any {
 	pq.mu.Lock()
 	defer pq.mu.Unlock()
 
-	items := make([]interface{}, 0, pq.items.Len())
+	items := make([]any, 0, pq.items.Len())
 	for pq.items.Len() > 0 {
 		item := heap.Pop(pq.items).(*PriorityItem)
 		items = append(items, item.Value)

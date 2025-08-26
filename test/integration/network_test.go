@@ -46,7 +46,7 @@ func TestNetwork_ConnectionRecoveryAfterDisconnection(t *testing.T) {
 	for i := range 5 {
 		msg := message.Message{
 			Topic: topic,
-			Data:  []byte(fmt.Sprintf("pre-disconnect-%d", i)),
+			Data:  fmt.Appendf(nil, "pre-disconnect-%d", i),
 			Headers: map[string]string{
 				"Phase": "pre-disconnect",
 				"ID":    fmt.Sprintf("%d", i),
@@ -75,7 +75,7 @@ func TestNetwork_ConnectionRecoveryAfterDisconnection(t *testing.T) {
 	for i := range 20 {
 		msg := message.Message{
 			Topic: topic,
-			Data:  []byte(fmt.Sprintf("stress-test-%d", i)),
+			Data:  fmt.Appendf(nil, "stress-test-%d", i),
 			Headers: map[string]string{
 				"Phase": "stress-test",
 				"ID":    fmt.Sprintf("%d", i),
@@ -98,7 +98,7 @@ func TestNetwork_ConnectionRecoveryAfterDisconnection(t *testing.T) {
 	for i := range 5 {
 		msg := message.Message{
 			Topic: topic,
-			Data:  []byte(fmt.Sprintf("post-recovery-%d", i)),
+			Data:  fmt.Appendf(nil, "post-recovery-%d", i),
 			Headers: map[string]string{
 				"Phase": "post-recovery",
 				"ID":    fmt.Sprintf("%d", i),
@@ -230,7 +230,7 @@ func TestNetwork_MessageDeliveryGuaranteesUnderNetworkIssues(t *testing.T) {
 
 		msg := message.Message{
 			Topic: topic,
-			Data:  []byte(fmt.Sprintf("delivery-test-%d", i)),
+			Data:  fmt.Appendf(nil, "delivery-test-%d", i),
 			Headers: map[string]string{
 				"message.Message-ID": messageID,
 				"Sequence":           fmt.Sprintf("%d", i),
@@ -337,7 +337,7 @@ func TestNetwork_NetworkLatencyImpact(t *testing.T) {
 
 		msg := message.Message{
 			Topic: topic,
-			Data:  []byte(fmt.Sprintf("latency-test-%d", i)),
+			Data:  fmt.Appendf(nil, "latency-test-%d", i),
 			Headers: map[string]string{
 				"message.Message-ID": fmt.Sprintf("lat-%d", i),
 				"Send-Time":          sendTime.Format(time.RFC3339Nano),
@@ -744,7 +744,7 @@ func TestNetwork_SubscriptionManagementAtProtocolLevel(t *testing.T) {
 		for i := range messagesPerTopic {
 			msg := message.Message{
 				Topic: topic,
-				Data:  []byte(fmt.Sprintf("message-%d", i)),
+				Data:  fmt.Appendf(nil, "message-%d", i),
 				Headers: map[string]string{
 					"Topic":              string(topic),
 					"message.Message-ID": fmt.Sprintf("%s-%d", string(topic), i),
@@ -788,7 +788,7 @@ func TestNetwork_SubscriptionManagementAtProtocolLevel(t *testing.T) {
 	for i := range 5 {
 		msg := message.Message{
 			Topic: newTopic,
-			Data:  []byte(fmt.Sprintf("dynamic-%d", i)),
+			Data:  fmt.Appendf(nil, "dynamic-%d", i),
 			Time:  time.Now(),
 		}
 		err = s.Publish(ctx, newTopic, msg)
@@ -810,7 +810,7 @@ func TestNetwork_SubscriptionManagementAtProtocolLevel(t *testing.T) {
 	for i := range 3 {
 		msg := message.Message{
 			Topic: newTopic,
-			Data:  []byte(fmt.Sprintf("after-stop-%d", i)),
+			Data:  fmt.Appendf(nil, "after-stop-%d", i),
 			Time:  time.Now(),
 		}
 		_ = s.Publish(ctx, newTopic, msg)

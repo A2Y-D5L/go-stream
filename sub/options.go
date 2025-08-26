@@ -49,7 +49,7 @@ func WithMaxDeliver(n int) Option      { return func(o *Options) { o.MaxDeliver 
 func WithExponentialBackoff(initial time.Duration, steps int, factor float64) Option {
 	seq := make([]time.Duration, 0, steps)
 	cur := initial
-	for i := 0; i < steps; i++ {
+	for range steps {
 		seq = append(seq, cur)
 		cur = time.Duration(float64(cur) * factor)
 	}

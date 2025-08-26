@@ -38,7 +38,7 @@ func (s *SlowSubscriber) Count() int64 {
 func TestBackpressure_Block(t *testing.T) {
 	s := helpers.CreateTestStream(t)
 	top := topic.Topic("test.backpressure.block")
-	slowSubscriber := &SlowSubscriber{delay: 100 * time.Millisecond}
+	slowSubscriber := &SlowSubscriber{delay: 200 * time.Millisecond}
 
 	// Use small buffer and blocking backpressure
 	sub, err := s.Subscribe(top, slowSubscriber,
@@ -104,10 +104,10 @@ func TestBackpressure_DropNewest(t *testing.T) {
 	numMessages := 10
 	publishStart := time.Now()
 
-	for i := 0; i < numMessages; i++ {
+	for i := range numMessages {
 		msg := message.Message{
 			Topic: top,
-			Data:  []byte(fmt.Sprintf("drop newest message %d", i)),
+			Data:  fmt.Appendf(nil, "drop newest message %d", i),
 			Time:  time.Now(),
 		}
 		err = s.Publish(ctx, top, msg)
@@ -162,7 +162,7 @@ func TestBackpressure_DropOldest(t *testing.T) {
 	for i := range numMessages {
 		msg := message.Message{
 			Topic: top,
-			Data:  []byte(fmt.Sprintf("drop oldest message %d", i)),
+			Data:  fmt.Appendf(nil, "drop oldest message %d", i),
 			Time:  time.Now(),
 		}
 		err = s.Publish(ctx, top, msg)
@@ -220,7 +220,7 @@ func TestBuffer_SizeLimit(t *testing.T) {
 	for i := range numMessages {
 		msg := message.Message{
 			Topic: top,
-			Data:  []byte(fmt.Sprintf("buffer test message %d", i)),
+			Data:  fmt.Appendf(nil, "buffer test message %d", i),
 			Time:  time.Now(),
 		}
 		err = s.Publish(ctx, top, msg)
@@ -261,7 +261,7 @@ func TestBuffer_DrainOnShutdown(t *testing.T) {
 	for i := range numMessages {
 		msg := message.Message{
 			Topic: top,
-			Data:  []byte(fmt.Sprintf("drain test message %d", i)),
+			Data:  fmt.Appendf(nil, "drain test message %d", i),
 			Time:  time.Now(),
 		}
 		err = s.Publish(ctx, top, msg)
@@ -321,7 +321,7 @@ func TestConcurrency_SingleWorker(t *testing.T) {
 	for i := range numMessages {
 		msg := message.Message{
 			Topic: top,
-			Data:  []byte(fmt.Sprintf("message %d", i)),
+			Data:  fmt.Appendf(nil, "message %d", i),
 			Time:  time.Now(),
 		}
 		err = s.Publish(ctx, top, msg)
@@ -384,7 +384,7 @@ func TestConcurrency_MultipleWorkers(t *testing.T) {
 	for i := range numMessages {
 		msg := message.Message{
 			Topic: top,
-			Data:  []byte(fmt.Sprintf("concurrent message %d", i)),
+			Data:  fmt.Appendf(nil, "concurrent message %d", i),
 			Time:  time.Now(),
 		}
 		err = s.Publish(ctx, top, msg)
@@ -449,10 +449,10 @@ func TestLoad_HighThroughput(t *testing.T) {
 		wg.Add(1)
 		go func(publisherID int) {
 			defer wg.Done()
-			for i := 0; i < messagesPerPublisher; i++ {
+			for i := range messagesPerPublisher {
 				msg := message.Message{
 					Topic: top,
-					Data:  []byte(fmt.Sprintf("load test %d-%d", publisherID, i)),
+					Data:  fmt.Appendf(nil, "load test %d-%d", publisherID, i),
 					Time:  time.Now(),
 				}
 				err := s.Publish(ctx, top, msg)
@@ -516,7 +516,7 @@ func TestLoad_BackpressureUnderLoad(t *testing.T) {
 	for i := range numMessages {
 		msg := message.Message{
 			Topic: top,
-			Data:  []byte(fmt.Sprintf("backpressure test %d", i)),
+			Data:  fmt.Appendf(nil, "backpressure test %d", i),
 			Time:  time.Now(),
 		}
 		err = s.Publish(ctx, top, msg)

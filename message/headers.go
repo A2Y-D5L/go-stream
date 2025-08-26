@@ -1,6 +1,7 @@
 package message
 
 import (
+	"maps"
 	"fmt"
 	"strconv"
 	"time"
@@ -135,9 +136,7 @@ func (h Headers) GetExpiration() (time.Time, error) {
 // Clone creates a copy of the headers
 func (h Headers) Clone() Headers {
 	clone := NewHeaders()
-	for k, v := range h {
-		clone[k] = v
-	}
+	maps.Copy(clone, h)
 	return clone
 }
 

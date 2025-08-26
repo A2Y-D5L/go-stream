@@ -96,7 +96,7 @@ func TestWorkerPool_TaskExecution(t *testing.T) {
 	numTasks := 10
 	wg.Add(numTasks)
 
-	for i := 0; i < numTasks; i++ {
+	for range numTasks {
 		err := wp.Submit(func() {
 			atomic.AddInt64(&counter, 1)
 			wg.Done()
@@ -272,10 +272,10 @@ func TestMultiError_ConcurrentAccess(t *testing.T) {
 
 	wg.Add(numGoroutines)
 
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		go func(id int) {
 			defer wg.Done()
-			for j := 0; j < errorsPerGoroutine; j++ {
+			for range errorsPerGoroutine {
 				me.Add(context.Canceled)
 			}
 		}(i)
@@ -303,7 +303,7 @@ func TestBoundedQueue_Basic(t *testing.T) {
 	}
 
 	// Push items
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		err := q.Push(i)
 		if err != nil {
 			t.Errorf("Failed to push item %d: %v", i, err)
@@ -321,7 +321,7 @@ func TestBoundedQueue_Basic(t *testing.T) {
 	}
 
 	// Pop items
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		item, ok := q.Pop()
 		if !ok {
 			t.Errorf("Failed to pop item %d", i)

@@ -42,10 +42,10 @@ func TestErrorRecovery(t *testing.T) {
 	defer cancel()
 
 	// Publish messages that will initially fail
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		msg := message.Message{
 			Topic: topic,
-			Data:  []byte(fmt.Sprintf("message-%d", i)),
+			Data:  fmt.Appendf(nil, "message-%d", i),
 			Time:  time.Now(),
 		}
 		err := s.Publish(ctx, topic, msg)
@@ -124,10 +124,9 @@ func TestGracefulDegradation(t *testing.T) {
 		count := atomic.LoadInt64(&processedCount)
 
 		// Simulate increasing processing delay (degradation)
-		delay := time.Duration(count*10) * time.Millisecond
-		if delay > 100*time.Millisecond {
-			delay = 100 * time.Millisecond // Cap the delay
-		}
+		delay := min(time.Duration(count*10)*time.Millisecond,
+			// Cap the delay
+			100*time.Millisecond)
 
 		time.Sleep(delay)
 		atomic.AddInt64(&processedCount, 1)
@@ -143,10 +142,10 @@ func TestGracefulDegradation(t *testing.T) {
 
 	// Publish messages at constant rate
 	messageCount := 20
-	for i := 0; i < messageCount; i++ {
+	for i := range messageCount {
 		msg := message.Message{
 			Topic: topic,
-			Data:  []byte(fmt.Sprintf("degraded-message-%d", i)),
+			Data:  fmt.Appendf(nil, "degraded-message-%d", i),
 			Time:  time.Now(),
 		}
 		err := s.Publish(ctx, topic, msg)
@@ -260,7 +259,7 @@ func TestCircuitBreakerPattern(t *testing.T) {
 	defer cancel()
 
 	// Send messages that will trigger circuit breaker
-	for i := 0; i < 15; i++ {
+	for i := range 15 {
 		var msgData string
 		if i < 5 {
 			msgData = "failing-operation"
@@ -320,10 +319,10 @@ func TestResourceExhaustionRecovery(t *testing.T) {
 	defer cancel()
 
 	// Publish messages to trigger exhaustion and recovery
-	for i := 0; i < 15; i++ {
+	for i := range 15 {
 		msg := message.Message{
 			Topic: topic,
-			Data:  []byte(fmt.Sprintf("resource-test-%d", i)),
+			Data:  fmt.Appendf(nil, "resource-test-%d", i),
 			Time:  time.Now(),
 		}
 		err := s.Publish(ctx, topic, msg)
@@ -400,7 +399,7 @@ func TestCascadingFailureContainment(t *testing.T) {
 		for _, topic := range topics {
 			msg := message.Message{
 				Topic: topic,
-				Data:  []byte(fmt.Sprintf("message-%d", i)),
+				Data:  fmt.Appendf(nil, "message-%d", i),
 				Time:  time.Now(),
 			}
 			err := s.Publish(ctx, topic, msg)

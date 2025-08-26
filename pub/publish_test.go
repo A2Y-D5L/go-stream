@@ -270,12 +270,12 @@ func TestRequest_MultipleResponders(t *testing.T) {
 	s := helpers.CreateTestStream(t)
 	// Set up multiple responders using test helpers
 	var subs []*nats.Subscription
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		responderID := i
 		sub, err := helpers.TestResponder(s,
 			topic.Topic("test.request.multiple"),
 			func(data []byte) ([]byte, error) {
-				return []byte(fmt.Sprintf("response from responder %d", responderID)), nil
+				return fmt.Appendf(nil, "response from responder %d", responderID), nil
 			})
 		require.NoError(t, err)
 		subs = append(subs, sub)
@@ -635,7 +635,7 @@ func TestPublish_ConcurrentPublishers(t *testing.T) {
 					topic.Topic("test.publish.concurrent"),
 					message.Message{
 						Topic: topic.Topic("test.publish.concurrent"),
-						Data:  []byte(fmt.Sprintf("publisher-%d-message-%d", publisherID, j)),
+						Data:  fmt.Appendf(nil, "publisher-%d-message-%d", publisherID, j),
 						Headers: map[string]string{
 							"Publisher-ID":        fmt.Sprintf("%d", publisherID),
 							"message.Message-Seq": fmt.Sprintf("%d", j),

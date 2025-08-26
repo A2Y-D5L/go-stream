@@ -3,6 +3,7 @@ package observability
 import (
 	"context"
 	"fmt"
+	"maps"
 	"sync"
 	"time"
 )
@@ -41,13 +42,13 @@ type Span interface {
 	SetName(name string)
 
 	// SetAttribute sets a span attribute
-	SetAttribute(key string, value interface{})
+	SetAttribute(key string, value any)
 
 	// SetStatus sets the span status
 	SetStatus(status SpanStatus, description string)
 
 	// AddEvent adds an event to the span
-	AddEvent(name string, attributes map[string]interface{})
+	AddEvent(name string, attributes map[string]any)
 
 	// End completes the span
 	End()
@@ -85,7 +86,7 @@ type SpanOption func(*SpanConfig)
 type SpanConfig struct {
 	Kind       SpanKind
 	Parent     SpanContext
-	Attributes map[string]interface{}
+	Attributes map[string]any
 }
 
 // WithSpanKind sets the span kind
@@ -96,14 +97,12 @@ func WithSpanKind(kind SpanKind) SpanOption {
 }
 
 // WithAttributes sets span attributes
-func WithAttributes(attrs map[string]interface{}) SpanOption {
+func WithAttributes(attrs map[string]any) SpanOption {
 	return func(c *SpanConfig) {
 		if c.Attributes == nil {
-			c.Attributes = make(map[string]interface{})
+			c.Attributes = make(map[string]any)
 		}
-		for k, v := range attrs {
-			c.Attributes[k] = v
-		}
+		maps.Copy(c.Attributes, attrs)
 	}
 }
 
@@ -122,7 +121,7 @@ type InMemorySpan struct {
 	kind        SpanKind
 	status      SpanStatus
 	description string
-	attributes  map[string]interface{}
+	attributes  map[string]any
 	events      []SpanEvent
 	startTime   time.Time
 	endTime     time.Time
@@ -131,9 +130,9 @@ type InMemorySpan struct {
 
 // SpanEvent represents an event within a span
 type SpanEvent struct {
-	Name       string                 `json:"name"`
-	Timestamp  time.Time              `json:"timestamp"`
-	Attributes map[string]interface{} `json:"attributes"`
+	Name       string         `json:"name"`
+	Timestamp  time.Time      `json:"timestamp"`
+	Attributes map[string]any `json:"attributes"`
 }
 
 // NewInMemorySpan creates a new in-memory span
@@ -143,7 +142,7 @@ func NewInMemorySpan(name string, context SpanContext, kind SpanKind) *InMemoryS
 		context:    context,
 		kind:       kind,
 		status:     SpanStatusUnset,
-		attributes: make(map[string]interface{}),
+		attributes: make(map[string]any),
 		events:     make([]SpanEvent, 0),
 		startTime:  time.Now(),
 	}
@@ -157,7 +156,7 @@ func (s *InMemorySpan) SetName(name string) {
 }
 
 // SetAttribute sets a span attribute
-func (s *InMemorySpan) SetAttribute(key string, value interface{}) {
+func (s *InMemorySpan) SetAttribute(key string, value any) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.attributes[key] = value
@@ -172,19 +171,17 @@ func (s *InMemorySpan) SetStatus(status SpanStatus, description string) {
 }
 
 // AddEvent adds an event to the span
-func (s *InMemorySpan) AddEvent(name string, attributes map[string]interface{}) {
+func (s *InMemorySpan) AddEvent(name string, attributes map[string]any) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	event := SpanEvent{
 		Name:       name,
 		Timestamp:  time.Now(),
-		Attributes: make(map[string]interface{}),
+		Attributes: make(map[string]any),
 	}
 
-	for k, v := range attributes {
-		event.Attributes[k] = v
-	}
+	maps.Copy(event.Attributes, attributes)
 
 	s.events = append(s.events, event)
 }
@@ -231,7 +228,7 @@ func NewInMemoryTracer() *InMemoryTracer {
 func (t *InMemoryTracer) Start(ctx context.Context, operationName string, opts ...SpanOption) (context.Context, Span) {
 	config := &SpanConfig{
 		Kind:       SpanKindInternal,
-		Attributes: make(map[string]interface{}),
+		Attributes: make(map[string]any),
 	}
 
 	for _, opt := range opts {
@@ -301,9 +298,7 @@ func (t *InMemoryTracer) GetSpans() map[string]*InMemorySpan {
 	defer t.mu.RUnlock()
 
 	spans := make(map[string]*InMemorySpan)
-	for k, v := range t.spans {
-		spans[k] = v
-	}
+	maps.Copy(spans, t.spans)
 	return spans
 }
 

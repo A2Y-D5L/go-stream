@@ -65,7 +65,7 @@ func TestNewLogger(t *testing.T) {
 			// Verify format
 			if tt.config.Format == JSON {
 				// Should be valid JSON
-				var logEntry map[string]interface{}
+				var logEntry map[string]any
 				if err := json.Unmarshal([]byte(output), &logEntry); err != nil {
 					t.Errorf("Expected valid JSON output, got error: %v", err)
 				}
@@ -248,7 +248,7 @@ func TestSampling(t *testing.T) {
 			})
 
 			// Log many messages
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				logger.Info("test message", slog.Int("iteration", i))
 			}
 
@@ -262,7 +262,7 @@ func TestSampling(t *testing.T) {
 
 			// Errors should never be sampled
 			buf.Reset()
-			for i := 0; i < 10; i++ {
+			for i := range 10 {
 				logger.Error("error message", slog.Int("iteration", i))
 			}
 
@@ -394,7 +394,7 @@ func TestSamplerShouldLog(t *testing.T) {
 
 	// Test rate limiting over many calls
 	infoCount := 0
-	for i := 0; i < 1000; i++ {
+	for range 1000 {
 		if sampler.shouldLog(slog.LevelInfo) {
 			infoCount++
 		}
@@ -414,8 +414,7 @@ func BenchmarkLogger_Info(b *testing.B) {
 		Output: &buf,
 	})
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := 0; b.Loop(); i++ {
 		logger.Info("benchmark message",
 			slog.String("key", "value"),
 			slog.Int("iteration", i),
@@ -435,8 +434,7 @@ func BenchmarkLogger_InfoWithSampling(b *testing.B) {
 		},
 	})
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := 0; b.Loop(); i++ {
 		logger.Info("benchmark message",
 			slog.String("key", "value"),
 			slog.Int("iteration", i),
@@ -452,8 +450,7 @@ func BenchmarkLogger_With(b *testing.B) {
 		Output: &buf,
 	})
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := 0; b.Loop(); i++ {
 		childLogger := logger.With(
 			slog.String("service", "test"),
 			slog.Int("instance", i),

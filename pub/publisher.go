@@ -1,6 +1,7 @@
 package pub
 
 import (
+	"maps"
 	"context"
 	"encoding/json"
 	"errors"
@@ -46,9 +47,7 @@ func (sp *StreamPublisher) Publish(ctx context.Context, t topic.Topic, msg messa
 		if out.Headers == nil {
 			out.Headers = make(map[string]string, len(cfg.headers))
 		}
-		for k, v := range cfg.headers {
-			out.Headers[k] = v
-		}
+		maps.Copy(out.Headers, cfg.headers)
 	}
 
 	nm := &nats.Msg{

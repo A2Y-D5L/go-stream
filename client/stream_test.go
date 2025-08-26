@@ -259,7 +259,7 @@ func TestStream_ConcurrentOperations(t *testing.T) {
 		const numGoroutines = 5
 		errChan := make(chan error, numGoroutines)
 
-		for i := 0; i < numGoroutines; i++ {
+		for range numGoroutines {
 			go func() {
 				ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 				defer cancel()
@@ -271,7 +271,7 @@ func TestStream_ConcurrentOperations(t *testing.T) {
 		successCount := 0
 		errorCount := 0
 
-		for i := 0; i < numGoroutines; i++ {
+		for range numGoroutines {
 			err := <-errChan
 			if err == nil {
 				successCount++

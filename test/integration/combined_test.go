@@ -63,10 +63,10 @@ func TestCombined_HighLoadWithPanicRecovery(t *testing.T) {
 	numMessages := 1000
 	startTime := time.Now()
 
-	for i := 0; i < numMessages; i++ {
+	for i := range numMessages {
 		msg := stream.Message{
 			Topic: top,
-			Data:  []byte(fmt.Sprintf("high load message %d", i)),
+			Data:  fmt.Appendf(nil, "high load message %d", i),
 			Time:  time.Now(),
 		}
 		err = s.Publish(ctx, top, msg)

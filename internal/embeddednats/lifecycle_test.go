@@ -84,7 +84,7 @@ func TestServerLifecycle_RestartScenarios(t *testing.T) {
 	t.Run("rapid restart cycles", func(t *testing.T) {
 		opts := createTestServerOptions()
 
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			server := createTestServer(t, opts)
 
 			server.Start()
@@ -114,7 +114,7 @@ func TestServerLifecycle_GracefulShutdown(t *testing.T) {
 
 		// Create multiple active connections
 		var connections []*nats.Conn
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			nc, err := nats.Connect(server.ClientURL())
 			require.NoError(t, err)
 			connections = append(connections, nc)
@@ -154,7 +154,7 @@ func TestServerLifecycle_GracefulShutdown(t *testing.T) {
 
 		// Start publishing in background
 		go func() {
-			for i := 0; i < 10; i++ {
+			for range 10 {
 				nc.Publish("test.msg", []byte("data"))
 				time.Sleep(50 * time.Millisecond)
 			}
@@ -180,7 +180,7 @@ func TestServerLifecycle_ResourceManagement(t *testing.T) {
 		initialGoroutines := runtime.NumGoroutine()
 
 		// Create and run multiple server lifecycles
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			opts := createTestServerOptions()
 			server := createTestServer(t, opts)
 
@@ -219,7 +219,7 @@ func TestServerLifecycle_ResourceManagement(t *testing.T) {
 		runtime.ReadMemStats(&initialMemStats)
 
 		// Create and run server lifecycles
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			opts := createTestServerOptions()
 			server := createTestServer(t, opts)
 
@@ -230,7 +230,7 @@ func TestServerLifecycle_ResourceManagement(t *testing.T) {
 			nc, err := nats.Connect(server.ClientURL())
 			require.NoError(t, err)
 
-			for j := 0; j < 100; j++ {
+			for range 100 {
 				err = nc.Publish("test", []byte("data"))
 				require.NoError(t, err)
 			}
@@ -330,10 +330,8 @@ func TestServerLifecycle_StateTransitions(t *testing.T) {
 		results := make(chan result, 20)
 
 		// Multiple goroutines accessing state concurrently
-		for i := 0; i < 20; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+		for range 20 {
+			wg.Go(func() {
 
 				port := server.Port()
 				url := server.ClientURL()
@@ -343,7 +341,7 @@ func TestServerLifecycle_StateTransitions(t *testing.T) {
 				cancel()
 
 				results <- result{port: port, url: url, err: err}
-			}()
+			})
 		}
 
 		wg.Wait()
@@ -446,7 +444,7 @@ func TestServerLifecycle_Performance(t *testing.T) {
 
 		start := time.Now()
 
-		for i := 0; i < cycles; i++ {
+		for i := range cycles {
 			opts := createTestServerOptions()
 			server := createTestServer(t, opts)
 
@@ -472,7 +470,7 @@ func TestServerLifecycle_Performance(t *testing.T) {
 		var wg sync.WaitGroup
 		errors := make(chan error, serverCount)
 
-		for i := 0; i < serverCount; i++ {
+		for i := range serverCount {
 			wg.Add(1)
 			go func(id int) {
 				defer wg.Done()
