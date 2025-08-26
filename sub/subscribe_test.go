@@ -557,8 +557,7 @@ func TestSubscription_Drain(t *testing.T) {
 	drainCtx, drainCancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer drainCancel()
 
-	err = sub.Drain(drainCtx)
-	assert.NoError(t, err)
+	assert.NoError(t, sub.Drain(drainCtx))
 
 	// Should have processed all messages
 	assert.Equal(t, int64(numMessages), subscriber.Count())

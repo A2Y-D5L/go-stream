@@ -435,20 +435,21 @@ func TestConcurrency_ResourceSharingUnderHighLoad(t *testing.T) {
 
 	// Create subscribers for each topic
 	for i, topic := range topics {
-		index := i // Capture for closure
-
-		subscriber := sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
-			atomic.AddInt64(&topicCounts[index], 1)
-			// Simulate CPU-intensive work
-			time.Sleep(2 * time.Millisecond)
-			return nil
-		})
-
-		sub, err := s.Subscribe(topic, subscriber,
+		sub, err := s.Subscribe(topic,
+			sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
+				atomic.AddInt64(&topicCounts[i], 1)
+				// Simulate CPU-intensive work
+				time.Sleep(2 * time.Millisecond)
+				return nil
+			}),
 			sub.WithConcurrency(5),
 			sub.WithBufferSize(100))
 		require.NoError(t, err)
-		defer sub.Stop()
+		defer func() {
+			if err := sub.Stop(); err != nil {
+				t.Logf("Error stopping subscriber for topic %s: %v", topic, err)
+			}
+		}()
 	}
 
 	// Wait for subscriptions to establish
@@ -665,15 +666,12 @@ func TestStress_MemoryUsageStabilityOverTime(t *testing.T) {
 
 	// Record memory stats
 	var memStats []runtime.MemStats
-
-	subscriber := sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
+	sub, err := s.Subscribe(topic, sub.SubscriberFunc(func(ctx context.Context, msg stream.Message) error {
 		// Create some temporary data to simulate real workloads
 		_ = make([]byte, 1024) // 1KB per message
 		time.Sleep(1 * time.Millisecond)
 		return nil
-	})
-
-	sub, err := s.Subscribe(topic, subscriber, sub.WithConcurrency(5))
+	}), sub.WithConcurrency(5))
 	require.NoError(t, err)
 	defer sub.Stop()
 
@@ -689,7 +687,7 @@ func TestStress_MemoryUsageStabilityOverTime(t *testing.T) {
 	memStats = append(memStats, initialMem)
 
 	// Run for multiple cycles
-	cycles := 5
+	cycles := 8
 	messagesPerCycle := 1000
 
 	for cycle := range cycles {

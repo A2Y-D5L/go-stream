@@ -104,11 +104,9 @@ func (ss *StreamSubscriber) Subscribe(t topic.Topic, sub Subscriber, opts ...Opt
 
 	// workers
 	var wg sync.WaitGroup
-	wg.Add(cfg.Concurrency)
 	stop := make(chan struct{})
 	for i := 0; i < cfg.Concurrency; i++ {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for {
 				select {
 				case <-stop:
@@ -134,7 +132,7 @@ func (ss *StreamSubscriber) Subscribe(t topic.Topic, sub Subscriber, opts ...Opt
 					}()
 				}
 			}
-		}()
+		})
 	}
 
 	return &coreSub{
@@ -147,36 +145,58 @@ func (ss *StreamSubscriber) Subscribe(t topic.Topic, sub Subscriber, opts ...Opt
 
 // coreSub implements the Subscription interface.
 type coreSub struct {
-	ns   *nats.Subscription
-	ch   chan message.Message
-	wg   *sync.WaitGroup
-	stop chan struct{}
+	ns       *nats.Subscription
+	ch       chan message.Message
+	wg       *sync.WaitGroup
+	stop     chan struct{}
+	stopOnce sync.Once
+	chOnce   sync.Once
 }
 
 func (c *coreSub) Drain(ctx context.Context) error {
-	// Stop accepting new messages from NATS.
+	// Stop accepting new messages from NATS but let pending ones complete
 	if c.ns != nil {
 		if err := c.ns.Unsubscribe(); err != nil && !errors.Is(err, nats.ErrConnectionClosed) {
 			return err
 		}
 	}
-	// Wait for queue to drain.
-	t := time.NewTicker(20 * time.Millisecond)
-	defer t.Stop()
+	
+	// Wait for the internal queue to drain with timeout
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	
+	timeout := time.After(5 * time.Second) // Internal timeout for queue draining
+	
 	for {
-		if len(c.ch) == 0 {
-			break
-		}
 		select {
+		case <-timeout:
+			// If queue doesn't drain within reasonable time, proceed to shutdown
+			goto SHUTDOWN
 		case <-ctx.Done():
-			goto STOP
-		case <-t.C:
+			// Context cancelled, proceed to shutdown
+			goto SHUTDOWN
+		case <-ticker.C:
+			// Check if queue is empty
+			if len(c.ch) == 0 {
+				goto SHUTDOWN
+			}
 		}
 	}
-STOP:
-	close(c.stop)
-	close(c.ch)
+	
+SHUTDOWN:
+	// Now close the message channel to signal no more messages will come
+	c.chOnce.Do(func() {
+		close(c.ch)
+	})
+	
+	// Wait for all workers to finish processing
 	c.wg.Wait()
+	
+	// Clean up stop channel
+	c.stopOnce.Do(func() {
+		close(c.stop)
+	})
+	
 	return nil
 }
 
@@ -184,8 +204,12 @@ func (c *coreSub) Stop() error {
 	if c.ns != nil {
 		_ = c.ns.Unsubscribe()
 	}
-	close(c.stop)
-	close(c.ch)
+	c.stopOnce.Do(func() {
+		close(c.stop)
+	})
+	c.chOnce.Do(func() {
+		close(c.ch)
+	})
 	c.wg.Wait()
 	return nil
 }
