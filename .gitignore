@@ -4,6 +4,7 @@
 !.gitignore
 !go.mod
 !go.sum
+!golangci.yml
 !LICENSE
 !Makefile
 !README.md
